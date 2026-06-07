@@ -1,0 +1,50 @@
+# macOS
+.DS_Store
+
+# Secrets / local build config (see Config.example.xcconfig)
+Config-Debug.xcconfig
+Config-Release.xcconfig
+
+# Xcode — per-machine UI state, schemes, breakpoints (keep xcshareddata in repo)
+**/xcuserdata/
+*.xcuserstate
+*.xccheckout
+*.xcscmblueprint
+
+# Xcode build artifacts
+build/
+DerivedData/
+*.moved-aside
+*.hmap
+
+# Archives & symbols (local exports, CI usually rebuilds)
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+# Swift Package Manager — command-line resolve output
+.build/
+.swiftpm/configuration/
+
+# Playgrounds
+timeline.xctimeline
+playground.xcworkspace/xcuserdata/
+
+# Tuist — generated files, never commit them
+# First-time setup: tuist install && tuist generate
+# After pulling changes that modify Project.swift or Tuist/Package.swift: re-run both commands
+StarterApp.xcodeproj/
+StarterApp.xcworkspace/
+Derived/
+DerivedDataRun/
+
+# Tuist build cache and SPM dependency build artifacts (keep Tuist/Package.resolved committed)
+.tuist-build/
+Tuist/.build/
+
+# Optional: fastlane & test output (uncomment if you add them)
+# fastlane/report.xml
+# fastlane/Preview.html
+# fastlane/screenshots/**/*.png
+# fastlane/test_output
+# *.xcresult

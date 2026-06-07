@@ -1,0 +1,8 @@
+{
+  "files.watcherExclude": {
+    "**/DerivedDataRun/**": true
+  },
+  "search.exclude": {
+    "**/DerivedDataRun": true
+  }
+}

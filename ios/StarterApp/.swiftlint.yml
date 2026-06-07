@@ -1,0 +1,45 @@
+# SwiftLint — run from this directory: `swiftlint` or `swiftlint lint --strict`
+# CI installs SwiftLint via Homebrew and runs strict lint before Tuist/Xcode.
+
+excluded:
+  - .build
+  - Tuist/.build
+  # Local/Xcode build products (not present on GitHub runners; avoids linting DerivedSources).
+  - DerivedDataRun
+  - DerivedData
+  # Tuist project manifests use ProjectDescription, not app code style.
+  - Project.swift
+  - Tuist.swift
+  - Tuist/Package.swift
+  # Generated from Pydantic; formatting owned by scripts/sync_models.py
+  - StarterApp/Models/GeneratedModels.swift
+
+line_length:
+  warning: 120
+  error: 200
+  ignores_comments: true
+  ignores_urls: true
+
+identifier_name:
+  min_length:
+    warning: 2
+  excluded:
+    - id
+    - x
+    - y
+
+type_body_length:
+  warning: 400
+  error: 600
+
+function_body_length:
+  warning: 100
+  error: 150
+
+file_length:
+  warning: 600
+  error: 900
+
+disabled_rules:
+  - todo
+  - trailing_whitespace

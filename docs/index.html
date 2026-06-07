@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- ═══════════════════════════════════════════════════════════════════════
+       CONFIGURATION — edit these values to customise the page
+       ═══════════════════════════════════════════════════════════════════════ -->
+  <script>
+    const CONFIG = {
+      // ── App identity ────────────────────────────────────────────────────
+      APP_NAME:        "AppName",
+      APP_TAGLINE:     "Something great is on its way.",
+      APP_DESCRIPTION: "We're building something you'll love. Drop your email below and you'll be the first to know when we launch.",
+
+      // ── Brand ───────────────────────────────────────────────────────────
+      // Any valid CSS colour string (hex, hsl, rgb, etc.)
+      BRAND_COLOR:     "#6366f1",          // indigo default — change to match your brand
+      BRAND_COLOR_DARK:"#4f46e5",          // darker shade used for hover states
+
+      // ── Supabase ─────────────────────────────────────────────────────────
+      // ⚠️  ALWAYS use your ANON key here — NEVER the service role key.
+      //    The anon key is designed to be public. The service role key is not.
+      SUPABASE_URL:      "https://YOUR_PROJECT_REF.supabase.co",
+      SUPABASE_ANON_KEY: "YOUR_ANON_KEY",
+
+      // ── Form ─────────────────────────────────────────────────────────────
+      PHONE_ENABLED:   true,               // set false to hide the phone field entirely
+      RATE_LIMIT:      5,                  // must match migration SQL (cosmetic only — DB enforces it)
+    };
+  </script>
+  <!-- ═══════════════════════════════════════════════════════════════════════ -->
+
+  <title id="page-title">Waitlist</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@700;800&family=Inter:wght@400;500;600&display=swap" rel="stylesheet" />
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --brand:       #6366f1;
+      --brand-dark:  #4f46e5;
+      --bg:          #0a0a0f;
+      --surface:     #111118;
+      --border:      rgba(255,255,255,0.08);
+      --text:        #f0f0f8;
+      --muted:       #8888aa;
+      --error:       #f87171;
+      --success:     #34d399;
+      --radius:      14px;
+      --font-display:'Syne', sans-serif;
+      --font-body:   'Inter', sans-serif;
+    }
+
+    html { height: 100%; }
+
+    body {
+      min-height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-body);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      padding: 2rem 1.25rem;
+    }
+
+    /* ── Subtle radial glow behind the card ── */
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background: radial-gradient(ellipse 60% 50% at 50% 0%, color-mix(in srgb, var(--brand) 18%, transparent), transparent 70%);
+      pointer-events: none;
+      z-index: 0;
+    }
+
+    .card {
+      position: relative;
+      z-index: 1;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: clamp(2rem, 5vw, 3.5rem);
+      max-width: 480px;
+      width: 100%;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.5);
+    }
+
+    /* ── Badge ── */
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.72rem;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: var(--brand);
+      background: color-mix(in srgb, var(--brand) 12%, transparent);
+      border: 1px solid color-mix(in srgb, var(--brand) 30%, transparent);
+      border-radius: 999px;
+      padding: 5px 12px;
+      margin-bottom: 1.5rem;
+    }
+    .badge::before {
+      content: '';
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: var(--brand);
+      animation: pulse 2s ease-in-out infinite;
+    }
+    @keyframes pulse {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50%       { opacity: 0.5; transform: scale(0.75); }
+    }
+
+    /* ── Headings ── */
+    h1 {
+      font-family: var(--font-display);
+      font-size: clamp(2rem, 6vw, 2.75rem);
+      font-weight: 800;
+      line-height: 1.1;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      margin-bottom: 0.75rem;
+    }
+
+    .tagline {
+      font-size: 1.05rem;
+      color: var(--muted);
+      line-height: 1.65;
+      margin-bottom: 2.25rem;
+    }
+
+    /* ── Form ── */
+    .form { display: flex; flex-direction: column; gap: 0.875rem; }
+
+    .field { display: flex; flex-direction: column; gap: 6px; }
+
+    label {
+      font-size: 0.8rem;
+      font-weight: 600;
+      color: var(--muted);
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+
+    input[type="email"],
+    input[type="tel"] {
+      background: rgba(255,255,255,0.04);
+      border: 1px solid var(--border);
+      border-radius: 9px;
+      color: var(--text);
+      font-family: var(--font-body);
+      font-size: 1rem;
+      padding: 0.75rem 1rem;
+      width: 100%;
+      transition: border-color 0.2s, box-shadow 0.2s;
+      outline: none;
+    }
+    input[type="email"]:focus,
+    input[type="tel"]:focus {
+      border-color: var(--brand);
+      box-shadow: 0 0 0 3px color-mix(in srgb, var(--brand) 20%, transparent);
+    }
+    input::placeholder { color: rgba(255,255,255,0.2); }
+
+    /* Honeypot — visually hidden, never seen by real users */
+    .hp { display: none; visibility: hidden; }
+
+    /* ── Submit button ── */
+    .btn {
+      background: var(--brand);
+      border: none;
+      border-radius: 9px;
+      color: #fff;
+      cursor: pointer;
+      font-family: var(--font-body);
+      font-size: 1rem;
+      font-weight: 600;
+      padding: 0.85rem 1.5rem;
+      transition: background 0.2s, transform 0.1s, box-shadow 0.2s;
+      margin-top: 0.25rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+    }
+    .btn:hover:not(:disabled) {
+      background: var(--brand-dark);
+      box-shadow: 0 8px 24px color-mix(in srgb, var(--brand) 40%, transparent);
+    }
+    .btn:active:not(:disabled) { transform: scale(0.98); }
+    .btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+    .spinner {
+      width: 16px; height: 16px;
+      border: 2px solid rgba(255,255,255,0.35);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin 0.7s linear infinite;
+      display: none;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Feedback messages ── */
+    .msg {
+      font-size: 0.875rem;
+      border-radius: 8px;
+      padding: 0.7rem 1rem;
+      display: none;
+    }
+    .msg.error   { background: rgba(248,113,113,0.12); color: var(--error);   border: 1px solid rgba(248,113,113,0.25); }
+    .msg.success { background: rgba(52,211,153,0.10);  color: var(--success); border: 1px solid rgba(52,211,153,0.25); }
+
+    /* ── Success state ── */
+    .success-card {
+      text-align: center;
+      display: none;
+    }
+    .success-icon {
+      font-size: 3rem;
+      margin-bottom: 1rem;
+      display: block;
+    }
+    .success-card h2 {
+      font-family: var(--font-display);
+      font-size: 1.75rem;
+      font-weight: 800;
+      margin-bottom: 0.5rem;
+    }
+    .success-card p { color: var(--muted); line-height: 1.6; }
+
+    /* ── Footer ── */
+    footer {
+      margin-top: 1.5rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+      text-align: center;
+      line-height: 1.6;
+      opacity: 0.7;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <!-- Form view -->
+    <div id="form-view">
+      <div class="badge">Coming Soon</div>
+      <h1 id="app-name"></h1>
+      <p class="tagline" id="app-description"></p>
+
+      <form class="form" id="waitlist-form" novalidate>
+        <!-- Honeypot: hidden from real users, bots fill it, submission is silently dropped -->
+        <input class="hp" type="text" name="website" id="hp-field" tabindex="-1" autocomplete="off" aria-hidden="true" />
+
+        <div class="field">
+          <label for="email">Email address <span style="color:var(--brand)">*</span></label>
+          <input type="email" id="email" name="email" placeholder="you@example.com" required autocomplete="email" />
+        </div>
+
+        <div class="field" id="phone-field-wrapper">
+          <label for="phone">Phone number <span style="color:var(--muted);font-weight:400">(optional)</span></label>
+          <input type="tel" id="phone" name="phone" placeholder="+1 555 000 0000" autocomplete="tel" />
+        </div>
+
+        <div class="msg error" id="error-msg" role="alert"></div>
+
+        <button type="submit" class="btn" id="submit-btn">
+          <span id="btn-label">Notify me at launch</span>
+          <span class="spinner" id="btn-spinner"></span>
+        </button>
+      </form>
+    </div>
+
+    <!-- Success view (shown after successful signup) -->
+    <div class="success-card" id="success-view">
+      <span class="success-icon">🎉</span>
+      <h2>You're on the list!</h2>
+      <p>We'll let you know the moment <strong id="success-app-name"></strong> is ready. Stay tuned.</p>
+    </div>
+  </div>
+
+  <footer>
+    Your email is safe with us. No spam, ever.
+  </footer>
+
+  <!-- Supabase JS (ESM CDN — no build step required) -->
+  <script type="module">
+    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
+
+    // ── Apply config to DOM ──────────────────────────────────────────────
+    document.title                                    = `${CONFIG.APP_NAME} — Waitlist`;
+    document.getElementById('app-name').textContent   = CONFIG.APP_NAME;
+    document.getElementById('app-description').textContent = CONFIG.APP_DESCRIPTION;
+    document.getElementById('success-app-name').textContent = CONFIG.APP_NAME;
+
+    // Apply brand colour as CSS variable
+    document.documentElement.style.setProperty('--brand',      CONFIG.BRAND_COLOR);
+    document.documentElement.style.setProperty('--brand-dark', CONFIG.BRAND_COLOR_DARK);
+
+    // Hide phone field if disabled
+    if (!CONFIG.PHONE_ENABLED) {
+      document.getElementById('phone-field-wrapper').style.display = 'none';
+    }
+
+    // ── Guard: warn in console if placeholder keys are still in place ────
+    if (CONFIG.SUPABASE_URL.includes('YOUR_PROJECT_REF') || CONFIG.SUPABASE_ANON_KEY === 'YOUR_ANON_KEY') {
+      console.error(
+        '[Waitlist] Supabase is not configured. ' +
+        'Edit the CONFIG block at the top of docs/index.html and set SUPABASE_URL and SUPABASE_ANON_KEY.'
+      );
+    }
+
+    const supabase = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+
+    // ── Helpers ──────────────────────────────────────────────────────────
+    const form       = document.getElementById('waitlist-form');
+    const emailInput = document.getElementById('email');
+    const phoneInput = document.getElementById('phone');
+    const hpField    = document.getElementById('hp-field');
+    const submitBtn  = document.getElementById('submit-btn');
+    const btnLabel   = document.getElementById('btn-label');
+    const spinner    = document.getElementById('btn-spinner');
+    const errorMsg   = document.getElementById('error-msg');
+    const formView   = document.getElementById('form-view');
+    const successView= document.getElementById('success-view');
+
+    function setLoading(loading) {
+      submitBtn.disabled  = loading;
+      spinner.style.display = loading ? 'block' : 'none';
+      btnLabel.style.display = loading ? 'none' : 'inline';
+    }
+
+    function showError(msg) {
+      errorMsg.textContent    = msg;
+      errorMsg.style.display  = 'block';
+    }
+
+    function clearError() {
+      errorMsg.textContent   = '';
+      errorMsg.style.display = 'none';
+    }
+
+    // ── Submit handler ───────────────────────────────────────────────────
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      clearError();
+
+      // ── Honeypot check: bots fill hidden fields, real users don't ───
+      if (hpField.value.trim() !== '') {
+        // Fake success — don't tell the bot it was caught
+        formView.style.display  = 'none';
+        successView.style.display = 'block';
+        return;
+      }
+
+      const email = emailInput.value.trim();
+      const phone = phoneInput.value.trim() || null;
+
+      if (!email) {
+        showError('Please enter your email address.');
+        emailInput.focus();
+        return;
+      }
+
+      setLoading(true);
+
+      try {
+        const { error } = await supabase
+          .from('waitlist')
+          .insert({ email, phone });
+
+        if (error) {
+          // Duplicate email
+          if (error.code === '23505') {
+            showError("You're already on the list! We'll be in touch.");
+            return;
+          }
+          // Rate limit (our custom trigger raises 'rate_limit_exceeded')
+          if (error.message?.includes('rate_limit_exceeded') || error.code === 'P0001') {
+            showError('Too many sign-ups from your connection. Please try again later.');
+            return;
+          }
+          // Supabase not configured yet
+          if (CONFIG.SUPABASE_URL.includes('YOUR_PROJECT_REF')) {
+            showError('The waitlist is not configured yet. Check the browser console for details.');
+            return;
+          }
+          throw error;
+        }
+
+        // Success
+        formView.style.display   = 'none';
+        successView.style.display = 'block';
+
+      } catch (err) {
+        console.error('[Waitlist] Unexpected error:', err);
+        showError('Something went wrong. Please try again in a moment.');
+      } finally {
+        setLoading(false);
+      }
+    });
+  </script>
+</body>
+</html>

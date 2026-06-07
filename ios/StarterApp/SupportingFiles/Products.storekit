@@ -1,0 +1,52 @@
+{
+  "identifier" : "4A8B3F2E-1C7D-4E9A-B6F0-2D5E8C3A7B1F",
+  "nonRenewingSubscriptions" : [
+
+  ],
+  "products" : [
+
+  ],
+  "settings" : {
+    "_applicationUsername" : ""
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "8F3D2A1C-7E4B-4F9D-A5C0-3B6E9D2F8A4C",
+      "localizations" : [
+
+      ],
+      "name" : "Pro",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [
+
+          ],
+          "codeOffers" : [
+
+          ],
+          "displayPrice" : "9.99",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "2C5E8A3F-1B7D-4E9C-A0F6-4D2B7E5C9A3F",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Unlock all Pro features",
+              "displayName" : "Pro Monthly",
+              "locale" : "en_US"
+            }
+          ],
+          "productID" : "com.example.StarterApp.pro.monthly",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "Pro Monthly",
+          "subscriptionGroupID" : "8F3D2A1C-7E4B-4F9D-A5C0-3B6E9D2F8A4C",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 2,
+    "minor" : 0
+  }
+}

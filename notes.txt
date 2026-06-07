@@ -1,0 +1,3 @@
+Had to mnuallyt create the xconfig release and debug fles for first time ios-gen
+
+app crashes due to no all vars in config debug 

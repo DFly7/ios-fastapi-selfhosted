@@ -1,0 +1,119 @@
+# iOS: Build a signed Release archive and upload to TestFlight.
+#
+# Triggered by a version tag (e.g. git tag v1.0.0 && git push --tags).
+# Also available via workflow_dispatch for manual runs.
+#
+# Prerequisites — run locally once before the first tag push:
+#   make setup-dist   ← creates App Store Connect record, seeds certs repo
+#
+# Required GitHub Secrets (printed by make setup-dist):
+#   DEVELOPMENT_TEAM, APP_BUNDLE_ID, APPLE_ID
+#   SUPABASE_URL, SUPABASE_ANON_KEY, PRODUCTION_BACKEND_URL
+#   POSTHOG_API_KEY (optional, may be empty)
+#   MATCH_GIT_URL, MATCH_PASSWORD, GIT_BASIC_AUTH
+#   APP_STORE_CONNECT_API_KEY_ID, APP_STORE_CONNECT_API_ISSUER_ID,
+#   APP_STORE_CONNECT_API_KEY_CONTENT
+
+name: Distribute to TestFlight
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+concurrency:
+  group: distribute-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  testflight:
+    runs-on: macos-15
+    timeout-minutes: 60
+    defaults:
+      run:
+        working-directory: ios/StarterApp
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pin Xcode — keep in sync with ios-ci.yml (simulator runtimes must exist on the image).
+      # Check available versions: https://github.com/actions/runner-images/blob/main/images/macos/macos-15-Readme.md
+      - name: Select Xcode 16.4
+        run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+
+      # Pinned tool versions match local `mise install` (tuist, swiftlint).
+      - name: Install mise (Tuist + SwiftLint)
+        uses: jdx/mise-action@v2
+        with:
+          install_args: tuist swiftlint
+          working_directory: ${{ github.workspace }}
+
+      - name: Install Fastlane (Bundler)
+        run: bundle install
+
+      # ── Config ─────────────────────────────────────────────────────────────
+      # Config-Debug/Release.xcconfig are gitignored. Write Release from secrets.
+      - name: Write Config-Debug.xcconfig (placeholder — not used in Release build)
+        run: cp Config.example.xcconfig Config-Debug.xcconfig
+
+      - name: Write Config-Release.xcconfig from secrets
+        env:
+          DEVELOPMENT_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}
+          APP_BUNDLE_ID: ${{ secrets.APP_BUNDLE_ID }}
+          PRODUCTION_BACKEND_URL: ${{ secrets.PRODUCTION_BACKEND_URL }}
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+        run: |
+          if [ -z "${PRODUCTION_BACKEND_URL}" ]; then
+            echo "::error::PRODUCTION_BACKEND_URL Actions secret is empty or missing. Set it to your public FastAPI HTTPS base URL (same as BACKEND_URL for release)."
+            exit 1
+          fi
+          # Enable PostHog only when a key was actually provided.
+          # Missing secrets arrive as empty strings — not set vs empty is the same here.
+          POSTHOG_ENABLED_VAL=$([ -n "${POSTHOG_API_KEY}" ] && echo "TRUE" || echo "FALSE")
+
+          # POSTHOG_HOST: bash must not expand $() here — write literal https:/$()/… for Xcode xcconfig (see Config.example.xcconfig).
+          cat > Config-Release.xcconfig << EOF
+          DEVELOPMENT_TEAM = ${DEVELOPMENT_TEAM}
+          PRODUCT_BUNDLE_IDENTIFIER = ${APP_BUNDLE_ID}
+          BACKEND_URL = ${PRODUCTION_BACKEND_URL}
+          SUPABASE_URL = ${SUPABASE_URL}
+          SUPABASE_ANON_KEY = ${SUPABASE_ANON_KEY}
+          POSTHOG_ENABLED = ${POSTHOG_ENABLED_VAL}
+          POSTHOG_API_KEY = ${POSTHOG_API_KEY}
+          POSTHOG_HOST = https:/\$()/us.i.posthog.com
+          DEBUG_INFORMATION_FORMAT = dwarf-with-dsym
+          EOF
+
+      # ── Tuist ──────────────────────────────────────────────────────────────
+      - name: Cache Tuist dependencies
+        uses: actions/cache@v4
+        with:
+          path: ios/StarterApp/.build
+          key: ${{ runner.os }}-tuist-${{ hashFiles('ios/StarterApp/Tuist/Package.swift') }}
+          restore-keys: |
+            ${{ runner.os }}-tuist-
+
+      - name: Fetch SPM dependencies
+        run: tuist install
+
+      - name: Generate Xcode project
+        run: tuist generate --no-open
+
+      # ── Fastlane beta ──────────────────────────────────────────────────────
+      - name: Upload to TestFlight
+        env:
+          MATCH_PASSWORD: ${{ secrets.MATCH_PASSWORD }}
+          MATCH_GIT_URL: ${{ secrets.MATCH_GIT_URL }}
+          GIT_BASIC_AUTH: ${{ secrets.GIT_BASIC_AUTH }}
+          APP_STORE_CONNECT_API_KEY_ID: ${{ secrets.APP_STORE_CONNECT_API_KEY_ID }}
+          APP_STORE_CONNECT_API_ISSUER_ID: ${{ secrets.APP_STORE_CONNECT_API_ISSUER_ID }}
+          APP_STORE_CONNECT_API_KEY_CONTENT: ${{ secrets.APP_STORE_CONNECT_API_KEY_CONTENT }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APP_BUNDLE_ID: ${{ secrets.APP_BUNDLE_ID }}
+          APP_NAME: ${{ secrets.APP_NAME }}
+          DEVELOPMENT_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}
+          GITHUB_RUN_NUMBER: ${{ github.run_number }}
+        run: bundle exec fastlane beta

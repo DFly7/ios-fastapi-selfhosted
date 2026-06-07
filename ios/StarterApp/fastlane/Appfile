@@ -1,0 +1,6 @@
+# Values are read from env vars injected by setup-dist.sh locally
+# and from GitHub Secrets in CI. Placeholders here are never used directly.
+
+app_identifier(ENV["APP_BUNDLE_ID"] || "com.yourcompany.yourapp")
+apple_id(ENV["APPLE_ID"] || "you@example.com")
+team_id(ENV["DEVELOPMENT_TEAM"] || "XXXXXXXXXX")

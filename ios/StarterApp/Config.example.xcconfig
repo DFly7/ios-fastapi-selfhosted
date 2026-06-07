@@ -1,0 +1,30 @@
+// Copy to Config-Debug.xcconfig and Config-Release.xcconfig (or edit those files directly).
+// ios/StarterApp/.gitignore ignores Config-Debug / Config-Release. If you already committed
+// real keys once, stop tracking them: git rm --cached ios/StarterApp/Config-Debug.xcconfig (and Release).
+// Use https:/$()/ so // inside URLs is not treated as an xcconfig comment.
+
+// --- Identity (required to build on a device or submit to App Store) ---
+// Find your 10-character Team ID at developer.apple.com -> Account -> Membership
+DEVELOPMENT_TEAM = XXXXXXXXXX
+PRODUCT_BUNDLE_IDENTIFIER = com.yourcompany.yourapp
+
+// --- Runtime secrets ---
+BACKEND_URL = https:/$()/localhost:8000
+SUPABASE_URL = https:/$()/yourproject.supabase.co
+SUPABASE_ANON_KEY = your_supabase_anon_key
+
+// --- PostHog (optional) ---
+// Leave POSTHOG_API_KEY empty to disable. If you use a key but want analytics off, set POSTHOG_ENABLED = FALSE.
+// US cloud: https://us.i.posthog.com  |  EU cloud: https://eu.i.posthog.com
+POSTHOG_ENABLED = FALSE
+POSTHOG_API_KEY =
+POSTHOG_HOST = https:/$()/us.i.posthog.com
+
+// --- RevenueCat ---
+// Required for in-app purchases. Get your key from app.revenuecat.com -> Project -> API Keys.
+// Use the "Apple App Store" public SDK key (starts with appl_).
+REVENUECAT_API_KEY = appl_xxxxxxxxxxxxxxxx
+
+// --- Release only ---
+// Required for crash reporting symbolication. Set this in Config-Release.xcconfig, not Debug.
+// DEBUG_INFORMATION_FORMAT = dwarf-with-dsym

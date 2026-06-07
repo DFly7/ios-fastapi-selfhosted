@@ -1,0 +1,9 @@
+# macOS
+.DS_Store
+**/.DS_Store
+
+# iOS: local DerivedData when using -derivedDataPath (e.g. ios/StarterApp/DerivedDataRun)
+**/DerivedDataRun/
+
+# Cursor: optional local MCP config (tokens); team template is .cursor/mcp.json.example
+.cursor/mcp.json

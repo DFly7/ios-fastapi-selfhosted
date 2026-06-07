@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>iOS · FastAPI · Supabase — Template Audit</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&family=Syne:wght@400;600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,400;0,9..40,500;0,9..40,600;1,9..40,400&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg: #0a0b0f;
+      --bg2: #12141c;
+      --ink: #e6e2d8;
+      --muted: #8a8596;
+      --accent: #ff5c39;
+      --accent2: #3dff9e;
+      --warn: #ffc14a;
+      --border: rgba(230, 226, 216, 0.12);
+      --card: rgba(18, 20, 28, 0.85);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      font-family: "DM Sans", system-ui, sans-serif;
+      font-optical-sizing: auto;
+      background: var(--bg);
+      color: var(--ink);
+      line-height: 1.55;
+      font-size: 17px;
+    }
+    .grain {
+      position: fixed; inset: 0; pointer-events: none; opacity: 0.04;
+      background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      z-index: 0;
+    }
+    header {
+      position: relative;
+      z-index: 2;
+      padding: 4rem 1.5rem 3rem;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    h1 {
+      font-family: Syne, sans-serif;
+      font-weight: 800;
+      font-size: clamp(2.2rem, 5vw, 3.6rem);
+      line-height: 1.05;
+      margin: 0 0 0.75rem;
+      letter-spacing: -0.03em;
+    }
+    .lede {
+      font-size: 1.15rem;
+      color: var(--muted);
+      max-width: 46ch;
+      margin-bottom: 2rem;
+    }
+    .meta {
+      display: flex; flex-wrap: wrap; gap: 0.75rem;
+      font-size: 0.82rem;
+      text-transform: uppercase;
+      letter-spacing: 0.12em;
+      color: var(--muted);
+    }
+    .meta span {
+      border: 1px solid var(--border);
+      padding: 0.35rem 0.65rem;
+      border-radius: 999px;
+    }
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 10;
+      background: rgba(10, 11, 15, 0.92);
+      backdrop-filter: blur(12px);
+      border-bottom: 1px solid var(--border);
+    }
+    nav ul {
+      list-style: none;
+      margin: 0;
+      padding: 0.75rem 1.5rem;
+      max-width: 1100px;
+      margin-inline: auto;
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.35rem 1rem;
+    }
+    nav a {
+      color: var(--muted);
+      text-decoration: none;
+      font-size: 0.8rem;
+      font-weight: 500;
+      transition: color 0.2s;
+    }
+    nav a:hover { color: var(--accent2); }
+    main { position: relative; z-index: 1; max-width: 1100px; margin: 0 auto; padding: 0 1.5rem 5rem; }
+    section {
+      margin-top: 3.5rem;
+      scroll-margin-top: 5rem;
+    }
+    h2 {
+      font-family: Syne, sans-serif;
+      font-weight: 700;
+      font-size: 1.65rem;
+      margin: 0 0 1rem;
+      letter-spacing: -0.02em;
+      border-left: 4px solid var(--accent);
+      padding-left: 1rem;
+    }
+    h3 {
+      font-family: Syne, sans-serif;
+      font-weight: 600;
+      font-size: 1.1rem;
+      margin: 1.75rem 0 0.75rem;
+      color: var(--warn);
+    }
+    .scores {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+      gap: 1rem;
+      margin: 2rem 0;
+    }
+    .score {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem;
+      text-align: center;
+    }
+    .score .n {
+      font-family: Syne, sans-serif;
+      font-size: 2.25rem;
+      font-weight: 800;
+      color: var(--accent2);
+    }
+    .score .l { font-size: 0.75rem; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; margin-top: 0.35rem; }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.35rem 1.5rem;
+      margin: 1rem 0;
+    }
+    ul { padding-left: 1.2rem; }
+    li { margin: 0.45rem 0; }
+    li::marker { color: var(--accent); }
+    code, .path {
+      font-family: "JetBrains Mono", ui-monospace, monospace;
+      font-size: 0.82em;
+      background: rgba(255,255,255,0.06);
+      padding: 0.12em 0.35em;
+      border-radius: 4px;
+    }
+    .path { display: block; margin: 0.35rem 0; font-size: 0.78rem; word-break: break-all; }
+    .bug {
+      border-color: var(--accent);
+      border-left: 4px solid var(--accent);
+    }
+    details {
+      margin: 1rem 0;
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 0.5rem 1rem;
+      background: rgba(255,255,255,0.02);
+    }
+    summary {
+      cursor: pointer;
+      font-family: Syne, sans-serif;
+      font-weight: 600;
+      padding: 0.5rem 0;
+    }
+    .next {
+      background: linear-gradient(135deg, rgba(255,92,57,0.12), rgba(61,255,158,0.08));
+      border-color: rgba(255,92,57,0.35);
+    }
+    footer {
+      text-align: center;
+      color: var(--muted);
+      font-size: 0.85rem;
+      padding: 3rem 1rem;
+      border-top: 1px solid var(--border);
+    }
+    @keyframes rise {
+      from { opacity: 0; transform: translateY(12px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    section { animation: rise 0.6s ease backwards; }
+    section:nth-child(2) { animation-delay: 0.05s; }
+    section:nth-child(3) { animation-delay: 0.1s; }
+  </style>
+</head>
+<body>
+  <div class="grain" aria-hidden="true"></div>
+  <header>
+    <p class="meta"><span>Repository review</span><span>April 2026</span><span>Full monorepo scan</span></p>
+    <h1>Template audit:<br />shipping, DX &amp; agents</h1>
+    <p class="lede">
+      Full-stack assessment of <strong>iOS-FastAPI-Supabase-AI</strong>: how fast someone can run with it,
+      App Store readiness, code conventions, developer experience, and Cursor/agent ergonomics — synthesized
+      from a parallel exploration of iOS, backend, Supabase, CI, and <code>.agents</code>.
+    </p>
+  </header>
+
+  <nav aria-label="Report sections">
+    <ul>
+      <li><a href="#summary">Summary</a></li>
+      <li><a href="#usability">Template usability</a></li>
+      <li><a href="#appstore">Path to App Store</a></li>
+      <li><a href="#conventions">Conventions</a></li>
+      <li><a href="#dx">Developer experience</a></li>
+      <li><a href="#agentx">Agent X</a></li>
+      <li><a href="#issues">Issues &amp; fixes</a></li>
+      <li><a href="#next">Next steps</a></li>
+    </ul>
+  </nav>
+
+  <main>
+    <section id="summary">
+      <h2>Executive summary</h2>
+      <p>
+        This is a <strong>strong production-oriented starter</strong>: Tuist as the iOS source of truth, xcconfig-driven secrets,
+        FastAPI with JWKS verification and real RLS migrations, integration tests against local Supabase, and a documented TestFlight path.
+        The main friction is <strong>onboarding surface area</strong> (several docs, env name splits, gitignored configs),
+        <strong>template renaming</strong> (many “StarterApp” / <code>com.example</code> touchpoints, no single rename script yet),
+        and a few <strong>doc/CI mismatches</strong> plus at least one <strong>workflow bug</strong> called out below.
+      </p>
+      <div class="scores" role="group" aria-label="Subjective maturity scores out of 10">
+        <div class="score"><div class="n">8.5</div><div class="l">Ship-ready stack</div></div>
+        <div class="score"><div class="n">7.5</div><div class="l">First-run usability</div></div>
+        <div class="score"><div class="n">8</div><div class="l">App Store path</div></div>
+        <div class="score"><div class="n">8</div><div class="l">DX (Makefile, mise)</div></div>
+        <div class="score"><div class="n">7</div><div class="l">Agent X guidance</div></div>
+      </div>
+    </section>
+
+    <section id="usability">
+      <h2>Template usability</h2>
+      <div class="card">
+        <h3>What works exceptionally well</h3>
+        <ul>
+          <li><strong>One command dev story</strong> — <code>make dev</code> and documented Supabase + backend + tunnel flows collapse weeks of glue.</li>
+          <li><strong>Reproducible toolchains</strong> — <code>mise</code> pins Tuist, Supabase CLI, SwiftLint, etc.</li>
+          <li><strong>CI honesty (mostly)</strong> — Backend unit tests, model sync check, iOS Tuist generate + unit tests mirror local targets.</li>
+          <li><strong>Security-conscious DB layer</strong> — RLS, trigger-only profile creation, hardened <code>is_pro</code> policies, waitlist rate limits in SQL.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Friction for a new cloner</h3>
+        <ul>
+          <li><strong>Generated Xcode projects are gitignored</strong> — must run <code>make ios-gen</code> (or Tuist) before Xcode is useful.</li>
+          <li><strong>Local xcconfigs and backend <code>.env</code> are gitignored</strong> — copy from examples; same pattern as CI synthesis.</li>
+          <li><strong>Ruby / Bundler for pretty test output</strong> — <code>make ios-test</code> and <code>make ios-build</code> use <code>bundle exec xcpretty</code> from <code>ios/StarterApp</code>; root README does not front-load <code>bundle install</code>.</li>
+          <li><strong>Multiple “how to run” narratives</strong> — <code>README.md</code>, <code>local-setup.md</code>, <code>backend/README.md</code>, manual multi-terminal flows.</li>
+          <li><strong>Env naming mental map</strong> — backend <code>SUPABASE_PUBLIC_ANON_KEY</code> vs iOS / GH secrets as <code>SUPABASE_ANON_KEY</code>.</li>
+          <li><strong>Simulator selection</strong> — Makefile heuristic can pick a simulator that disagrees with the selected Xcode SDK (CI documents this class of risk).</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="appstore">
+      <h2>Path to App Store</h2>
+      <div class="card">
+        <h3>Strengths</h3>
+        <ul>
+          <li><strong>Privacy manifest</strong> present with tracking declaration, collected data types, UserDefaults reason (PostHog-related).</li>
+          <li><strong>ATS / local networking</strong> configured for the local-dev story.</li>
+          <li><strong>Capabilities</strong> — Sign in with Apple and In-App Purchase entitlements wired in Tuist.</li>
+          <li><strong>Fastlane + Match</strong> — <code>ios/StarterApp/fastlane/</code>; Makefile targets <code>setup-dist</code>, <code>beta</code>, <code>release</code>; <code>distribute.yml</code> on version tags for TestFlight.</li>
+          <li><strong>Export compliance</strong> — non-exempt encryption flag set with explanation in project definition.</li>
+          <li><strong>Release xcconfig</strong> — dSYM-friendly settings; placeholders for production URLs.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Gaps / watch items</h3>
+        <ul>
+          <li><strong>UI tests</strong> — still default XCTest scaffold; not exercised in iOS CI (only <code>StarterAppTests</code>), despite README implying broader test CI in one line — align docs or add UITests to the workflow.</li>
+          <li><strong>Bundle ID coherence</strong> — app id comes from xcconfig; test bundle IDs in <code>Project.swift</code> may drift if only xcconfig is edited.</li>
+          <li><strong>Backend deploy</strong> — Docker build / optional GHCR push exists; no included workflow deploys FastAPI to a host (template stops at image).</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="conventions">
+      <h2>Skeleton code &amp; conventions</h2>
+      <div class="card">
+        <h3>Verdict: good, opinionated, teachable</h3>
+        <ul>
+          <li><strong>Clear MV-oriented layout</strong> — <code>Views/</code>, <code>ViewModels/</code>, <code>Services/</code>, <code>Models/</code>, <code>Utilities/</code>.</li>
+          <li><strong>Modern Swift</strong> — Swift Testing for units; concurrency flags and MainActor defaults in Tuist.</li>
+          <li><strong>API contract discipline</strong> — Pydantic schemas + <code>scripts/sync_models.py</code> → <code>GeneratedModels.swift</code> (SwiftLint excludes generated file).</li>
+          <li><strong>Backend layering</strong> — <code>api/</code>, <code>core/</code>, <code>middleware/</code>, <code>services/</code>, <code>repositories/</code>, <code>schemas/</code> is easy to extend.</li>
+          <li><strong>Tuist discipline</strong> — matches repo rules: edit <code>Project.swift</code> and <code>Tuist/Package.swift</code>, not generated pbxproj.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Small inconsistencies to tighten</h3>
+        <ul>
+          <li><strong>Profile API vs schema</strong> — <code>ProfileOut</code> includes <code>is_pro</code> but route <code>select</code> may omit DB column until aligned — responses won’t reflect subscription state from DB.</li>
+          <li><strong>Localization flags</strong> in project without a committed <code>.xcstrings</code> yet — fine for a skeleton, worth one sample string catalog when you want emphasis on i18n.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="dx">
+      <h2>Developer experience</h2>
+      <div class="card">
+        <ul>
+          <li><strong>Makefile</strong> is the spine: <code>validate</code>, <code>lint</code>, <code>backend-test</code>, <code>ios-test</code>, <code>ios-build</code>, <code>check-models</code>, distribution helpers.</li>
+          <li><strong>Secrets workflow</strong> documented in <code>.github/CI_GITHUB_SECRETS.md</code>.</li>
+          <li><strong>Production ops caveats</strong> (know them early): in-process rate limits unless Redis storage configured; optional metrics endpoint needs network protection; webhook may warn-and-accept if secret unset; request body logging default — tune for production.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="agentx">
+      <h2>Agent X (Cursor &amp; autonomous agents)</h2>
+      <div class="card">
+        <h3>What agents get today</h3>
+        <ul>
+          <li><strong>Always-on <code>monorepo.mdc</code></strong> — root commands, Tuist edit surfaces, <code>docs/</code> policy, Supabase MCP caveats.</li>
+          <li><strong>Excellent <code>AGENTS.md</code></strong> — stack map, testing tables, MCP hosted vs local, verification commands, internal vs published docs.</li>
+          <li><strong>Large skill library</strong> (~75 topics) — high value when matched to task; risk of overload unless runtime curates relevance.</li>
+          <li><strong><code>mcp.json.example</code></strong> — cloud + local Supabase MCP URLs; gitignored real config.</li>
+        </ul>
+      </div>
+      <div class="card">
+        <h3>Gaps for agent ergonomics</h3>
+        <ul>
+          <li>No root <code>CLAUDE.md</code> / <code>GEMINI.md</code> while some skills still reference them.</li>
+          <li><strong>Single rule file</strong> — optional path-scoped rules for <code>backend/</code> vs <code>ios/</code> would reduce cross-layer mistakes.</li>
+          <li><strong>No “after clone” checklist in <code>AGENTS.md</code></strong> for renaming bundle, URL scheme, Supabase project ref, MCP — agents benefit from one canonical list.</li>
+          <li><strong>Using-superpowers skill</strong> assumes non-Cursor tool names; Cursor users rely on <code>AGENTS.md</code> + rules as the real contract.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="issues">
+      <h2>Confirmed issues &amp; doc drift</h2>
+      <div class="card">
+        <h3>Medium</h3>
+        <ul>
+          <li>README claims UI tests “running in CI” — <code>ios-ci.yml</code> only runs <code>StarterAppTests</code>.</li>
+          <li>CI comment vs <code>Project.swift</code>: signing disabled via CLI for simulator; verify comments stay accurate.</li>
+          <li>Optional GHCR image push gated on <code>PUBLISH_BACKEND_IMAGE</code> — README table can state that explicitly.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section id="next">
+      <h2>Next steps — rename / fork automation</h2>
+      <div class="card next">
+        <p>Your idea: <strong>one script that renames everything “StarterApp-related” to a user-supplied app name.</strong> A robust script should cover at least:</p>
+        <ul>
+          <li><strong>Tuist</strong> — target names, scheme, module imports in tests, <code>Project.swift</code> paths, product name.</li>
+          <li><strong>Directories</strong> — <code>ios/StarterApp/StarterApp</code> → new app folder; test targets folders.</li>
+          <li><strong>Bundle IDs &amp; URL scheme</strong> — <code>Config.example.xcconfig</code>, entitlements, Supabase redirect URLs, <code>APIConfig</code> / Info.plist keys if hardcoded.</li>
+          <li><strong>Swift</strong> — <code>@testable import</code>, app struct name (<code>StarterAppApp</code> → <code>MyAppApp</code>), any string literals.</li>
+          <li><strong>Repo metadata</strong> — README title, <code>AGENTS.md</code> paths, workflow <code>-only-testing:</code> strings, Fastlane app identifiers.</li>
+          <li><strong>Supabase / backend</strong> — cosmetic references only unless you also template Supabase project id.</li>
+          <li><strong>Dry-run mode</strong> and <strong>idempotency</strong> — show diff before write; optional backup branch.</li>
+        </ul>
+        <p>Implementation sketch: small Python or shell driver + explicit <em>allowlist</em> of glob patterns to avoid rewriting <code>.git</code>, lockfiles, and binaries; run <code>make check-models</code> and <code>make ios-gen</code> after.</p>
+      </div>
+    </section>
+
+    <section>
+      <h2>Key paths (bookmark)</h2>
+      <details open>
+        <summary>iOS / Tuist</summary>
+        <span class="path">ios/StarterApp/Project.swift</span>
+        <span class="path">ios/StarterApp/Tuist/Package.swift</span>
+        <span class="path">ios/StarterApp/Config.example.xcconfig</span>
+        <span class="path">ios/StarterApp/fastlane/Fastfile</span>
+      </details>
+      <details>
+        <summary>Backend &amp; DB</summary>
+        <span class="path">backend/app/main.py</span>
+        <span class="path">backend/app/core/auth.py</span>
+        <span class="path">supabase/migrations/</span>
+      </details>
+      <details>
+        <summary>CI &amp; agents</summary>
+        <span class="path">.github/workflows/ios-ci.yml</span>
+        <span class="path">.github/workflows/distribute.yml</span>
+        <span class="path">AGENTS.md</span>
+        <span class="path">.cursor/rules/monorepo.mdc</span>
+        <span class="path">.agents/skills/</span>
+      </details>
+    </section>
+  </main>
+
+  <footer>
+    Generated for internal template review. Open this file in a browser (or Cursor Canvas) for the full layout.
+    <br /><code>.cursor/canvas/ios-template-shipping-review.html</code>
+  </footer>
+</body>
+</html>

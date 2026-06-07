@@ -1,0 +1,118 @@
+# iOS: install Tuist deps, generate project, build + unit-test on Simulator.
+#
+# Notes:
+# - CODE_SIGNING_ALLOWED=NO is set in Project.swift base settings, so no
+#   certificates or provisioning profiles are required.
+# - Config-Debug.xcconfig / Config-Release.xcconfig are gitignored (local secrets).
+#   A CI step below generates them from Config.example.xcconfig; placeholder values
+#   are sufficient for a Simulator build. Real secrets (SUPABASE_ANON_KEY etc.)
+#   are not needed to compile or run tests on a Simulator.
+# - Deployment target: verify ios/StarterApp/Project.swift matches simulators on
+#   the pinned runner (macos-15 + bundled Xcode; adjust OS= below if needed).
+
+name: iOS CI
+
+on:
+  push:
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios-ci.yml"
+  pull_request:
+    paths:
+      - "ios/**"
+      - ".github/workflows/ios-ci.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+    timeout-minutes: 30
+    defaults:
+      run:
+        working-directory: ios/StarterApp
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # Pin to an Xcode whose *simulator* runtimes actually exist on the runner.
+      # Older 16.x images ship 16.2 (SDK 18.2) but GitHub often drops matching iOS 18.2
+      # devices; 16.4 is the image default and pairs with iOS 18.5 “iPhone 16” sims.
+      # Available versions: https://github.com/actions/runner-images/blob/main/images/macos/macos-15-Readme.md
+      - name: Select Xcode 16.4
+        run: sudo xcode-select -s /Applications/Xcode_16.4.app/Contents/Developer
+
+      # Pinned versions: .mise.toml (tuist, swiftlint). Avoid Homebrew so CI matches local `mise install`.
+      - name: Install mise (Tuist + SwiftLint)
+        uses: jdx/mise-action@v2
+        with:
+          install_args: tuist swiftlint
+          working_directory: ${{ github.workspace }}
+
+      - name: SwiftLint
+        run: swiftlint lint --strict --config .swiftlint.yml
+
+      # ── Tuist ──────────────────────────────────────────────────────────────
+      # Cache resolved SPM packages fetched by `tuist install`.
+      # Key includes Package.swift so the cache is busted on dependency changes.
+      - name: Cache Tuist dependencies
+        uses: actions/cache@v4
+        with:
+          path: ios/StarterApp/.build
+          key: ${{ runner.os }}-tuist-${{ hashFiles('ios/StarterApp/Tuist/Package.swift') }}
+          restore-keys: |
+            ${{ runner.os }}-tuist-
+
+      # Config-Debug/Release.xcconfig are gitignored (local secrets).
+      # Copy the example file so Tuist can generate the project. Placeholder values
+      # in the example are sufficient — no real secrets needed for a Simulator build.
+      - name: Generate xcconfig from example
+        run: |
+          cp Config.example.xcconfig Config-Debug.xcconfig
+          cp Config.example.xcconfig Config-Release.xcconfig
+
+      - name: Fetch SPM dependencies
+        run: tuist install
+
+      - name: Generate Xcode project
+        run: tuist generate --no-open
+
+      # ── Simulator ──────────────────────────────────────────────────────────
+      # Runners install many simulator runtimes (e.g. iOS 18.x and iOS 26.x). Picking the
+      # newest UDID from simctl can choose a runtime the *pinned* Xcode cannot target
+      # (xcodebuild exit 70). OS must match `iphonesimulator` for the active Xcode.
+      - name: Select iOS Simulator OS (matches xcode-select)
+        working-directory: ${{ github.workspace }}
+        run: |
+          SIM_OS=$(xcrun --sdk iphonesimulator --show-sdk-version)
+          echo "iphonesimulator OS for this Xcode: $SIM_OS"
+          echo "SIM_OS=$SIM_OS" >> "$GITHUB_ENV"
+
+      # ── Build ──────────────────────────────────────────────────────────────
+      - name: Install xcpretty
+        run: gem install xcpretty --no-document
+
+      - name: Build for testing
+        run: |
+          set -o pipefail
+          xcodebuild build-for-testing \
+            -workspace StarterApp.xcworkspace \
+            -scheme StarterApp \
+            -destination "platform=iOS Simulator,name=iPhone 16,OS=$SIM_OS" \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty
+
+      # ── Unit tests ─────────────────────────────────────────────────────────
+      - name: Run unit tests
+        run: |
+          set -o pipefail
+          xcodebuild test-without-building \
+            -workspace StarterApp.xcworkspace \
+            -scheme StarterApp \
+            -destination "platform=iOS Simulator,name=iPhone 16,OS=$SIM_OS" \
+            -only-testing:StarterAppTests \
+            CODE_SIGNING_ALLOWED=NO \
+            | xcpretty

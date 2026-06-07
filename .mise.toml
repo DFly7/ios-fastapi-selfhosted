@@ -1,0 +1,19 @@
+# mise.toml — single source of truth for tool versions across backend, iOS, and Supabase.
+# Install mise: https://mise.jdx.dev/getting-started.html
+# After installing: `mise install` to set up all tools.
+
+[tools]
+# Backend
+python     = "3.12"   # matches requires-python = ">=3.12" in backend/pyproject.toml
+uv         = "0.11.2" # pinned; bump with `mise use uv@latest`
+
+# iOS
+tuist      = "4.44.3" # pinned; bump with `mise use tuist@latest`
+swiftlint  = "0.63.2" # pinned; run from ios/StarterApp: `swiftlint lint --strict`
+
+# Supabase (keep in sync: .github/workflows/backend-integration.yml, supabase-migrations.yml)
+supabase   = "2.84.2" # pinned; bump with `mise use supabase@latest`
+
+[settings]
+# Always use the pinned versions — never fall through to system tools.
+not_found_auto_install = false

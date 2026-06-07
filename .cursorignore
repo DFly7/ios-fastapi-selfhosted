@@ -1,0 +1,2 @@
+# Local Xcode derived data (see scripts/ios-sim.sh -derivedDataPath). Gitignored; exclude from Cursor indexing too.
+**/DerivedDataRun/

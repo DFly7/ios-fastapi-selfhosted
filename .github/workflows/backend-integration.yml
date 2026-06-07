@@ -1,0 +1,81 @@
+# Backend integration tests: spins up the full local Supabase stack (Postgres +
+# GoTrue + PostgREST) via `supabase start`, then runs pytest against the real
+# database to verify migrations, the handle_new_user trigger, and RLS policies.
+#
+# Intentionally NOT triggered on pull_request:
+#   - `supabase start` pulls ~1-2 GB of Docker images and takes ~90 s on first run.
+#   - PRs are covered by the unit-test job in backend-ci.yml (mocked Supabase).
+#   - Runs on every push to main and on demand via workflow_dispatch.
+#
+# No secrets required — local Supabase keys are emitted by `supabase status`.
+
+name: Backend Integration Tests
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "backend/**"
+      - "supabase/**"
+      - ".github/workflows/backend-integration.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  integration:
+    name: Supabase + FastAPI integration
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # ── Supabase local stack ────────────────────────────────────────────────
+      - uses: supabase/setup-cli@v1
+        with:
+          # Pinned with .mise.toml [tools] supabase — bump both together.
+          version: 2.84.2
+
+      - name: Start local Supabase stack
+        # Runs from repo root so the CLI finds the supabase/ config directory.
+        run: supabase start
+
+      - name: Export local Supabase credentials to GITHUB_ENV
+        # `supabase status -o env` writes shell-quoted lines like:
+        #   API_URL="http://127.0.0.1:54321"
+        #   ANON_KEY="eyJ..."
+        #   SERVICE_ROLE_KEY="eyJ..."
+        # sed strips the surrounding quotes so GITHUB_ENV receives bare values,
+        # preventing pydantic from seeing literal '"' chars inside the URL/key strings.
+        run: supabase status -o env | sed 's/="\(.*\)"/=\1/' >> "$GITHUB_ENV"
+
+      # ── Python / FastAPI ────────────────────────────────────────────────────
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "backend/uv.lock"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+        working-directory: backend
+
+      - name: Run integration tests
+        run: uv run pytest tests/integration/ -v -m integration --tb=short
+        working-directory: backend
+        env:
+          ENVIRONMENT: ci
+          LOG_JSON: "false"
+          RATE_LIMIT_ENABLED: "false"
+          # Mapped from the names emitted by `supabase status -o env`
+          SUPABASE_URL: ${{ env.API_URL }}
+          SUPABASE_PUBLIC_ANON_KEY: ${{ env.ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ env.SERVICE_ROLE_KEY }}
+
+      # ── Cleanup ─────────────────────────────────────────────────────────────
+      - name: Stop local Supabase stack
+        if: always()
+        run: supabase stop --no-backup

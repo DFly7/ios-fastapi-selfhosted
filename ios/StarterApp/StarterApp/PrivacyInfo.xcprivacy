@@ -1,0 +1,81 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <!--
+        App-level privacy manifest (required since May 2024).
+
+        SDK-level manifests (Supabase-swift, PostHog, PLCrashReporter) are
+        bundled inside those SPM packages and are aggregated automatically by
+        Xcode 15.3+ even for static SPM frameworks — no need to duplicate
+        their Required Reason API entries here.
+
+        Required Reason APIs used directly by this app target:
+        - NSPrivacyAccessedAPICategoryUserDefaults (CA92.1)
+          Reason: reading/writing settings stored by this app itself.
+
+        Data collected by this app:
+        - Email Address: app explicitly sends the signed-in user's email to
+          PostHog via PostHogSDK.identify() in AuthService.applySession().
+        - User ID: app sends the Supabase user UUID to PostHog via identify().
+          Both are linked to identity and used solely for product analytics —
+          not for cross-app/cross-site tracking (NSPrivacyTracking = false).
+    -->
+
+    <!-- Set to true and list domains only if this app does cross-app/cross-site tracking. -->
+    <key>NSPrivacyTracking</key>
+    <false/>
+    <key>NSPrivacyTrackingDomains</key>
+    <array/>
+
+    <!--
+        Data types this app collects. Each entry maps to an App Store nutrition-
+        label category. Update this list when you add new collection points.
+    -->
+    <key>NSPrivacyCollectedDataTypes</key>
+    <array>
+        <!-- Email sent to PostHog via identify() after sign-in. -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeEmailAddress</string>
+            <!-- Linked to the authenticated user's identity in PostHog. -->
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <!-- Not used for cross-app advertising/tracking. -->
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+            </array>
+        </dict>
+        <!-- Supabase user UUID sent to PostHog via identify() as the distinct ID. -->
+        <dict>
+            <key>NSPrivacyCollectedDataType</key>
+            <string>NSPrivacyCollectedDataTypeUserID</string>
+            <key>NSPrivacyCollectedDataTypeLinked</key>
+            <true/>
+            <key>NSPrivacyCollectedDataTypeTracking</key>
+            <false/>
+            <key>NSPrivacyCollectedDataTypePurposes</key>
+            <array>
+                <string>NSPrivacyCollectedDataTypePurposeAnalytics</string>
+            </array>
+        </dict>
+    </array>
+
+    <!-- Required Reason APIs accessed by this app process. -->
+    <key>NSPrivacyAccessedAPITypes</key>
+    <array>
+        <dict>
+            <key>NSPrivacyAccessedAPIType</key>
+            <string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+            <key>NSPrivacyAccessedAPITypeReasons</key>
+            <array>
+                <!-- CA92.1: Access info from the same app that wrote it. -->
+                <string>CA92.1</string>
+            </array>
+        </dict>
+    </array>
+</dict>
+</plist>

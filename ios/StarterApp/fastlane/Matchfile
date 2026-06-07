@@ -1,0 +1,12 @@
+# Certificates and provisioning profiles are stored in a private git repo.
+# Run `make setup-dist` to set MATCH_GIT_URL and seed the repo locally before
+# pushing to CI — CI can only pull certs that already exist in the repo.
+
+git_url(ENV["MATCH_GIT_URL"] || "https://github.com/yourorg/certs")
+git_basic_authorization(ENV["GIT_BASIC_AUTH"])
+
+storage_mode("git")
+type("appstore")
+
+app_identifier(ENV["APP_BUNDLE_ID"] || "com.yourcompany.yourapp")
+username(ENV["APPLE_ID"] || "you@example.com")

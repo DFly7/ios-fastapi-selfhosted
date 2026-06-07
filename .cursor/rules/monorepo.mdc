@@ -1,0 +1,12 @@
+---
+description: Repo-wide defaults for agents — root, validation, Tuist, docs boundary
+alwaysApply: true
+---
+
+# Monorepo defaults
+
+- **Working directory:** Run shell commands from the **repository root** unless the task is clearly limited to a single subdirectory (then `cd` there explicitly).
+- **Verification:** Before claiming work is merge-ready or fully passing, prefer **`make validate`** from repo root. For narrow changes, use the smallest Makefile target that still covers what you changed (`make backend-test`, `make ios-test`, `make lint` — see `make help`).
+- **iOS project shape:** This app is **Tuist-generated**. Change **`ios/StarterApp/Project.swift`**, **`Tuist/Package.swift`**, and **`.xcconfig`** — do **not** hand-edit **`*.pbxproj`** or files under the generated `.xcodeproj` (they are/regenerate as gitignored or overwritten by `tuist generate`).
+- **`docs/` is for GitHub Pages only** (published site). Do **not** add agent specs, implementation plans, scratch notes, or internal runbooks there. Save Superpowers planning output to **`.agents/superpowers/plans/`** (tracked), or another path the user specifies.
+- **Supabase:** For **hosted** vs **local** MCP and CLI, follow **`AGENTS.md`** (Supabase MCP section). Do not assume MCP `execute_sql` hits **local** DB unless the active MCP server is the **local** URL and `supabase start` is running.

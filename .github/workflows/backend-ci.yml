@@ -1,0 +1,165 @@
+# Backend: install deps, run pytest, build Docker image.
+#
+# Secrets (GitHub → Settings → Secrets and variables → Actions):
+# - Do NOT put real API keys in this file.
+# - For smoke/unit tests: use plain `env:` values below (placeholders are fine if the app
+#   does not call external services during those tests).
+# - For integration tests that hit Supabase: add repository secrets, e.g. SUPABASE_URL and
+#   SUPABASE_PUBLIC_ANON_KEY, then reference them only in `env:` (see optional block in test job).
+# - Prefer "Environments" (staging/production) with protection rules if a workflow deploys
+#   or uses elevated credentials.
+# - Forks: secrets are not passed to workflows from forks on pull_request; keep PR jobs
+#   passing with placeholders unless you use a dedicated integraton workflow on main only.
+# - Docker publish: repository variable PUBLISH_BACKEND_IMAGE must be exactly `true`
+#   (Settings → Secrets and variables → Actions → Variables) to push to GHCR after a
+#   non-PR run. Otherwise the job still builds the image but does not log in or push.
+
+name: Backend CI
+
+on:
+  push:
+    paths:
+      - "backend/**"
+      - "scripts/sync_models.py"
+      - "ios/StarterApp/StarterApp/Models/GeneratedModels.swift"
+      - ".github/workflows/backend-ci.yml"
+  pull_request:
+    paths:
+      - "backend/**"
+      - "scripts/sync_models.py"
+      - "ios/StarterApp/StarterApp/Models/GeneratedModels.swift"
+      - ".github/workflows/backend-ci.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "backend/uv.lock"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Ruff (lint)
+        run: uv run ruff check .
+
+      - name: Ruff (format)
+        run: uv run ruff format --check .
+
+      - name: Mypy
+        run: uv run mypy app
+
+  test:
+    runs-on: ubuntu-latest
+    needs: lint
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "backend/uv.lock"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Run tests
+        env:
+          ENVIRONMENT: ci
+          LOG_JSON: "false"
+          RATE_LIMIT_ENABLED: "false"
+          # Placeholders for CI; replace with secrets if tests need a real project:
+          # SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          # SUPABASE_PUBLIC_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          uv run pytest tests/ -v --tb=short -m "not integration" \
+            --cov=app \
+            --cov-report=term-missing:skip-covered
+          {
+            echo ""
+            echo "## Coverage"
+            echo ""
+            echo '```text'
+            uv run coverage report --skip-covered --show-missing
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  check-models:
+    name: Swift models in sync
+    runs-on: ubuntu-latest
+    needs: test
+    defaults:
+      run:
+        working-directory: backend
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "backend/uv.lock"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Check GeneratedModels.swift is up to date
+        run: uv run python ../scripts/sync_models.py --check
+
+  docker-build:
+    runs-on: ubuntu-latest
+    needs: test
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request' && vars.PUBLISH_BACKEND_IMAGE == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract image metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/backend
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix=sha-
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      - name: Build image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          file: backend/Dockerfile
+          push: ${{ github.event_name != 'pull_request' && vars.PUBLISH_BACKEND_IMAGE == 'true' }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

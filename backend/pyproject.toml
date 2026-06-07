@@ -1,0 +1,75 @@
+[project]
+name = "backend"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = [
+    "fastapi>=0.115.0",
+    "starlette>=0.38.6",
+    "uvicorn[standard]>=0.30.6",
+    "pydantic>=2.12.4",
+    "pydantic-settings>=2.7.1",
+    "supabase>=2.24.0",
+    "postgrest>=2.24.0",
+    "PyJWT>=2.10.1",
+    "cryptography>=41.0.7",
+    "httpx>=0.28.1",
+    "slowapi>=0.1.9",
+    "structlog>=24.4.0",
+    "prometheus-client>=0.21.0",
+    "sentry-sdk>=2.17.0",
+    "resend[async]>=2.26.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.3.3",
+    "pytest-asyncio>=0.24.0",
+    "pytest-cov>=6.0.0",
+    "ruff>=0.9.0",
+    "mypy>=1.13.0",
+]
+
+[tool.uv]
+package = false
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+src = ["app", "tests"]
+
+[tool.ruff.format]
+quote-style = "double"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
+# FastAPI dependency injection uses callables in parameter defaults (Depends/Security).
+[tool.ruff.lint.per-file-ignores]
+"app/**" = ["B008"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.mypy]
+python_version = "3.12"
+strict = false
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = false
+plugins = ["pydantic.mypy"]
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+markers = [
+    "integration: requires a live local Supabase stack (supabase start); skipped in unit CI",
+]
+filterwarnings = [
+    # Starlette 1.x deprecated HTTP_422_UNPROCESSABLE_ENTITY in its public API
+    # but its own internal exception handler still references the old name.
+    # Nothing to fix in our code; suppress until Starlette patches itself.
+    "ignore:'HTTP_422_UNPROCESSABLE_ENTITY' is deprecated:DeprecationWarning",
+    # supabase-py passes `timeout` and `verify` to AsyncPostgrestClient using the
+    # old positional/keyword API that postgrest-py now flags as deprecated.
+    # This is an internal library issue — no fix required in our code.
+    "ignore:The 'timeout' parameter is deprecated:DeprecationWarning:supabase",
+    "ignore:The 'verify' parameter is deprecated:DeprecationWarning:supabase",
+]

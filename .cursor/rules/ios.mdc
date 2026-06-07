@@ -1,0 +1,13 @@
+---
+description: Tuist iOS app — schemes, Swift Testing, Makefile; points to AGENTS.md
+globs: ios/**/*.swift
+alwaysApply: false
+---
+
+# iOS (SwiftUI / Tuist)
+
+- **Canonical detail:** **`AGENTS.md`** → *TDD and testing* → **iOS**, plus **`ios/StarterApp/Project.swift`**, **`Makefile`** (`make help`).
+- **Verify changes:** From repo root, **`make ios-test`** (unit, **`StarterAppTests`**). UI: **`make ios-test-ui`**. Full gate: **`make validate`** (includes **`ios-test`** then **`ios-build`**; no UI tests).
+- **Project shape:** Edits go to **`Project.swift`**, **`Tuist/Package.swift`**, **`.xcconfig`** — not hand-edited **`.pbxproj`**. Regenerate: **`make ios-gen`** (`tuist install && tuist generate --no-open`).
+- **Tests:** **Swift Testing** in **`StarterAppTests`** (`@Suite`, `@Test`, `#expect`). **UI:** **XCTest** in **`StarterAppUITests`**. Workspace **`StarterApp.xcworkspace`**, scheme **`StarterApp`**, simulator via **`SIM_ID`** in Makefile.
+- **Generated models:** **`ios/StarterApp/StarterApp/Models/GeneratedModels.swift`** — do not hand-edit; use backend schemas + **`make sync-models`**.
