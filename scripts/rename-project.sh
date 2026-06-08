@@ -47,17 +47,15 @@ DRY_RUN=false
 APP_NAME=""
 BUNDLE_ID=""
 API_NAME=""
-SUPABASE_PROJECT_ID=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --dry-run)          DRY_RUN=true; shift ;;
-    --app-name)         APP_NAME="$2"; shift 2 ;;
-    --bundle-id)        BUNDLE_ID="$2"; shift 2 ;;
-    --api-name)         API_NAME="$2"; shift 2 ;;
-    --supabase-project) SUPABASE_PROJECT_ID="$2"; shift 2 ;;
+    --dry-run)   DRY_RUN=true; shift ;;
+    --app-name)  APP_NAME="$2"; shift 2 ;;
+    --bundle-id) BUNDLE_ID="$2"; shift 2 ;;
+    --api-name)  API_NAME="$2"; shift 2 ;;
     --help|-h)
-      echo "Usage: $0 [--dry-run] [--app-name NAME] [--bundle-id ID] [--api-name NAME] [--supabase-project ID]"
+      echo "Usage: $0 [--dry-run] [--app-name NAME] [--bundle-id ID] [--api-name NAME]"
       exit 0
       ;;
     *) die "Unknown argument: $1. Run with --help for usage." ;;
@@ -143,13 +141,6 @@ if [[ -z "$API_NAME" ]]; then
   API_NAME="${API_NAME:-${APP_NAME} API}"
 fi
 
-# --- SUPABASE_PROJECT_ID ---
-if [[ -z "$SUPABASE_PROJECT_ID" ]]; then
-  echo -n "  Supabase local project ID [${APP_NAME_KEBAB}]: "
-  read -r SUPABASE_PROJECT_ID
-  SUPABASE_PROJECT_ID="${SUPABASE_PROJECT_ID:-${APP_NAME_KEBAB}}"
-fi
-
 # ─── Summary ────────────────────────────────────────────────────────────────
 
 echo ""
@@ -159,7 +150,6 @@ echo "  starterapp (slugs)    →  ${APP_NAME_LOWER}"
 echo "  starter-app (kebab)   →  ${APP_NAME_KEBAB}"
 echo "  com.example.StarterApp →  ${BUNDLE_ID}"
 echo "  Starter API           →  ${API_NAME}"
-echo "  ios-fastapi-supabase-starter → ${SUPABASE_PROJECT_ID}"
 echo ""
 
 if [[ "$DRY_RUN" == false ]]; then
@@ -195,10 +185,8 @@ apply_substitutions() {
   do_sed 'com\.example\.StarterAppUITests'         "${BUNDLE_ID}UITests"              "$file"
   do_sed 'com\.example\.StarterAppTests'           "${BUNDLE_ID}Tests"                "$file"
   do_sed 'com\.example\.StarterApp'                "${BUNDLE_ID}"                     "$file"
-  # Auth redirect scheme (supabase config.toml uses the old bundle as a URL scheme)
+  # Auth redirect scheme
   do_sed 'com\.example\.starter://'               "${BUNDLE_ID}://"                  "$file"
-  # Supabase local project ID
-  do_sed 'ios-fastapi-supabase-starter'            "${SUPABASE_PROJECT_ID}"           "$file"
   # Backend API name
   do_sed 'Starter API'                             "${API_NAME}"                      "$file"
   # PascalCase variants — longer compound names first
@@ -348,11 +336,9 @@ if [[ "$DRY_RUN" == false ]]; then
   echo "       cp ios/${APP_NAME}/Config.example.xcconfig ios/${APP_NAME}/Config-Debug.xcconfig"
   echo "       # Edit Config-Debug.xcconfig:"
   echo "       #   PRODUCT_BUNDLE_IDENTIFIER = ${BUNDLE_ID}"
+  echo "       #   BACKEND_URL = http://localhost:8000  (or your production URL)"
   echo ""
-  echo "  3. Verify the Supabase redirect URL matches your bundle ID:"
-  echo "       supabase/config.toml → additional_redirect_urls = [\"${BUNDLE_ID}://\"]"
-  echo ""
-  echo "  4. Run the full validation suite:"
+  echo "  3. Run the full validation suite:"
   echo "       make validate"
   echo ""
   warn "If 'tuist generate' shows stale names, clear the global Tuist cache:"

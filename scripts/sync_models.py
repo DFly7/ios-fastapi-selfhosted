@@ -218,11 +218,11 @@ def check_sql_drift(schema_classes: dict[str, type]) -> None:
     in any CREATE TABLE column list. This is a heuristic — it's intentionally
     lenient (computed fields, joins, etc. are fine to omit from SQL).
     """
-    migrations_dir = REPO_ROOT / "supabase" / "migrations"
+    migrations_dir = REPO_ROOT / "backend" / "alembic" / "versions"
     if not migrations_dir.exists():
         return
 
-    sql_text = "".join(f.read_text() for f in sorted(migrations_dir.glob("*.sql")))
+    sql_text = "".join(f.read_text() for f in sorted(migrations_dir.glob("*.py")))
 
     # Rough extraction of column names from CREATE TABLE blocks
     table_blocks = re.findall(

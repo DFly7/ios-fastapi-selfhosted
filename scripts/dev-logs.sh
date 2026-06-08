@@ -4,9 +4,9 @@
 # Does everything dev.sh does, then splits the current terminal into log panes:
 #
 #   ┌─────────────────────────────┐
-#   │         FastAPI Logs        │  ← this pane (current terminal)
+#   │       FastAPI Logs          │  ← this pane (current terminal)
 #   ├──────────────┬──────────────┤
-#   │  Supabase    │     iOS      │
+#   │  PostgreSQL  │     iOS      │
 #   │    Logs      │    Logs      │
 #   └──────────────┴──────────────┘
 #
@@ -45,8 +45,12 @@ done
 # Bootstrap
 # ---------------------------------------------------------------------------
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-# shellcheck source=_lib.sh
-source "$REPO_ROOT/scripts/_lib.sh"
+BACKEND_DIR="$REPO_ROOT/backend"
+BACKEND_HEALTHZ="http://127.0.0.1:8000/healthz"
+XCCONFIG="$REPO_ROOT/ios/StarterApp/Config-Debug.xcconfig"
+XCCONFIG_EXAMPLE="$REPO_ROOT/ios/StarterApp/Config.example.xcconfig"
+IOS_DIR="$REPO_ROOT/ios/StarterApp"
+IOS_SIM="$REPO_ROOT/scripts/ios-sim.sh"
 
 SESSION="dev-stack"
 
@@ -71,46 +75,76 @@ cleanup() {
   echo ""
   echo "==> Shutting down…"
   tmux kill-session -t "$SESSION" 2>/dev/null || true
-  (cd "$BACKEND_DIR" && docker compose down 2>/dev/null) || true
-  supabase stop --no-backup 2>/dev/null || true
+  (cd "$REPO_ROOT" && docker compose down 2>/dev/null) || true
   echo "==> Done."
 }
 trap cleanup INT TERM EXIT
 
 # ---------------------------------------------------------------------------
-# 1–2. Supabase
+# 1–2. Docker Compose + Migrations
 # ---------------------------------------------------------------------------
-start_supabase
+echo "==> Starting dev stack (PostgreSQL + FastAPI + Adminer)…"
+cd "$REPO_ROOT"
+docker compose up --build -d
+
+echo "==> Running Alembic migrations…"
+sleep 3
+docker compose exec backend uv run alembic upgrade head
 
 # ---------------------------------------------------------------------------
-# 3. Backend .env
+# 3. Wait for backend
 # ---------------------------------------------------------------------------
-configure_backend_env
+echo "==> Waiting for backend to be ready…"
+max_attempts=30
+attempt=0
+while ! curl -s "$BACKEND_HEALTHZ" &>/dev/null; do
+  attempt=$((attempt + 1))
+  if [[ $attempt -ge $max_attempts ]]; then
+    echo "ERROR: Backend did not become ready after ${max_attempts} attempts"
+    exit 1
+  fi
+  echo "  (waiting… ${attempt}/${max_attempts})"
+  sleep 1
+done
+echo "✓ Backend is ready"
 
 # ---------------------------------------------------------------------------
-# 4–5. FastAPI — detached so we can proceed; logs streamed in tmux pane
+# 4. iOS xcconfig
 # ---------------------------------------------------------------------------
-echo "==> Starting FastAPI backend (docker compose)…"
-(cd "$BACKEND_DIR" && docker compose up --build --detach)
+echo "==> Configuring iOS…"
+if [[ ! -f "$XCCONFIG" ]]; then
+  cp "$XCCONFIG_EXAMPLE" "$XCCONFIG"
+fi
 
-wait_for_backend
+# Write BACKEND_URL (escaping colons and slashes for xcconfig safety)
+BACKEND_URL="http://127.0.0.1:8000"
+BACKEND_URL_ESCAPED="${BACKEND_URL//:/\$()/}"  # : → $()
+BACKEND_URL_ESCAPED="${BACKEND_URL_ESCAPED//\//\/}"  # / → /
+
+# Update or add BACKEND_URL
+if grep -q "^BACKEND_URL = " "$XCCONFIG"; then
+  sed -i '' "s|^BACKEND_URL = .*|BACKEND_URL = $BACKEND_URL_ESCAPED|" "$XCCONFIG"
+else
+  echo "BACKEND_URL = $BACKEND_URL_ESCAPED" >> "$XCCONFIG"
+fi
 
 # ---------------------------------------------------------------------------
-# 6. iOS xcconfig
-# ---------------------------------------------------------------------------
-configure_ios_xcconfig
-
-# ---------------------------------------------------------------------------
-# 7. Tuist + iOS Simulator
+# 5. Tuist + iOS Simulator
 # ---------------------------------------------------------------------------
 if ! $NO_IOS; then
-  run_tuist "$REGEN"
+  if $REGEN; then
+    echo "==> Running tuist install + generate (--regen)…"
+    (cd "$IOS_DIR" && tuist install && tuist generate)
+  else
+    echo "==> Running tuist generate…"
+    (cd "$IOS_DIR" && tuist generate)
+  fi
   echo "==> Building and launching iOS Simulator…"
   "$IOS_SIM"
 fi
 
 # ---------------------------------------------------------------------------
-# 8. Build log scripts (written to temp files — runs inside each pane at
+# 6. Build log scripts (written to temp files — runs inside each pane at
 #    open time, not now, so container lookups are always fresh and errors
 #    keep the pane alive rather than silently exiting).
 # ---------------------------------------------------------------------------
@@ -124,31 +158,26 @@ PANE_PATH="${PANE_PATH}:/Applications/Docker.app/Contents/Resources/bin"
 cat > "$LOGSCRIPTS/fastapi.sh" <<SCRIPT
 #!/usr/bin/env bash
 export PATH="${PANE_PATH}:\$PATH"
-cd '${BACKEND_DIR}'
+cd '${REPO_ROOT}'
 echo "==> FastAPI logs (docker compose)"
 echo ""
-docker compose logs -f --tail=100
+docker compose logs -f --tail=100 backend
 SCRIPT
 
-# Supabase — resolves the right container at open time, never exits on error
-cat > "$LOGSCRIPTS/supa.sh" <<SCRIPT
+# PostgreSQL — resolves the right container at open time, never exits on error
+cat > "$LOGSCRIPTS/postgres.sh" <<SCRIPT
 #!/usr/bin/env bash
 export PATH="${PANE_PATH}:\$PATH"
-echo "==> Supabase logs"
+echo "==> PostgreSQL logs"
 echo ""
-# Try most-useful containers first (kong = API gateway, auth, then any supabase)
-CID=""
-for pat in supabase_kong supabase-kong supabase_auth supabase_rest supabase; do
-  CID=\$(docker ps --filter "name=\${pat}" --format '{{.ID}}' | head -1)
-  [[ -n "\$CID" ]] && break
-done
+CID=\$(docker ps --filter "name=.*postgres.*" --format '{{.ID}}' | head -1)
 if [[ -n "\$CID" ]]; then
   NAME=\$(docker inspect --format '{{.Name}}' "\$CID" | tr -d '/')
   echo "    container : \$NAME"
   echo ""
   docker logs -f --tail=100 "\$CID"
 else
-  echo "No Supabase container found. Running containers:"
+  echo "No PostgreSQL container found. Running containers:"
   echo ""
   docker ps --format "  {{.Names}}"
   echo ""
@@ -167,16 +196,16 @@ xcrun simctl spawn booted log stream \\
   --level info 2>&1
 SCRIPT
 
-chmod +x "$LOGSCRIPTS/fastapi.sh" "$LOGSCRIPTS/supa.sh" "$LOGSCRIPTS/ios.sh"
+chmod +x "$LOGSCRIPTS/fastapi.sh" "$LOGSCRIPTS/postgres.sh" "$LOGSCRIPTS/ios.sh"
 
 # ---------------------------------------------------------------------------
-# 9. Open log panes
+# 7. Open log panes
 # ---------------------------------------------------------------------------
 echo ""
 echo "==> Launching log view…"
 echo ""
-printf '  %-16s  →  %s\n' "Supabase Studio"  "http://127.0.0.1:54323"
 printf '  %-16s  →  %s\n' "FastAPI docs"     "http://127.0.0.1:8000/docs"
+printf '  %-16s  →  %s\n' "Adminer DB"       "http://127.0.0.1:8080"
 echo ""
 
 if [[ "${TERM_PROGRAM:-}" == "iTerm.app" ]] && [[ -z "${TMUX:-}" ]]; then
@@ -188,7 +217,7 @@ tell application "iTerm2"
   tell current window
     tell current tab
       tell current session
-        split horizontally with default profile command "$LOGSCRIPTS/supa.sh"
+        split horizontally with default profile command "$LOGSCRIPTS/postgres.sh"
       end tell
     end tell
   end tell
@@ -200,7 +229,7 @@ tell application "iTerm2"
   tell current window
     tell current tab
       tell current session
-        set bottomPane to (split horizontally with default profile command "$LOGSCRIPTS/supa.sh")
+        set bottomPane to (split horizontally with default profile command "$LOGSCRIPTS/postgres.sh")
       end tell
       tell bottomPane
         split vertically with default profile command "$LOGSCRIPTS/ios.sh"
@@ -234,18 +263,18 @@ else
     tmux split-window -v -t "$SESSION:0"
     tmux select-layout -t "$SESSION:0" even-vertical
     tmux select-pane -t "$SESSION:0.0" -T "  FastAPI  "
-    tmux select-pane -t "$SESSION:0.1" -T "  Supabase  "
+    tmux select-pane -t "$SESSION:0.1" -T "  PostgreSQL  "
     tmux send-keys -t "$SESSION:0.0" "'$LOGSCRIPTS/fastapi.sh'" Enter
-    tmux send-keys -t "$SESSION:0.1" "'$LOGSCRIPTS/supa.sh'"    Enter
+    tmux send-keys -t "$SESSION:0.1" "'$LOGSCRIPTS/postgres.sh'"    Enter
   else
     tmux rename-window -t "$SESSION:0" "logs"
     tmux split-window -v -p 40 -t "$SESSION:0"
     tmux split-window -h    -t "$SESSION:0.1"
     tmux select-pane -t "$SESSION:0.0" -T "  FastAPI  "
-    tmux select-pane -t "$SESSION:0.1" -T "  Supabase  "
+    tmux select-pane -t "$SESSION:0.1" -T "  PostgreSQL  "
     tmux select-pane -t "$SESSION:0.2" -T "  iOS Simulator  "
     tmux send-keys -t "$SESSION:0.0" "'$LOGSCRIPTS/fastapi.sh'" Enter
-    tmux send-keys -t "$SESSION:0.1" "'$LOGSCRIPTS/supa.sh'"    Enter
+    tmux send-keys -t "$SESSION:0.1" "'$LOGSCRIPTS/postgres.sh'"    Enter
     tmux send-keys -t "$SESSION:0.2" "'$LOGSCRIPTS/ios.sh'"     Enter
   fi
 

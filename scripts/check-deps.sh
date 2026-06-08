@@ -126,13 +126,6 @@ check_tool "uv" \
   "${MISE_PREFIX} uv --version" \
   "mise install  (uv is pinned in .mise.toml)"
 
-# ── Supabase ─────────────────────────────────────────────────────────────────
-echo ""
-printf "  %bSupabase%b\n" "$BOLD" "$RESET"
-
-check_tool "supabase" \
-  "${MISE_PREFIX} supabase --version" \
-  "mise install  (supabase is pinned in .mise.toml)"
 
 # ── iOS ──────────────────────────────────────────────────────────────────────
 echo ""
