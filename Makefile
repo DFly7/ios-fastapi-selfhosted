@@ -8,15 +8,14 @@ SIM_ID ?= $(shell xcrun simctl list devices available | grep -i iphone | tail -1
 
 # ── Local dev ────────────────────────────────────────────────────────────────
 
-dev: ## Full local stack: Supabase + FastAPI + iOS Simulator
+dev: ## Start Postgres + backend + iOS Simulator
 	./scripts/dev.sh $(ARGS)
 
-dev-logs: ## Same as dev + 3-pane log view (FastAPI / Supabase / iOS)
+dev-logs: ## Same as dev + 3-pane log view (FastAPI / Postgres / iOS)
 	./scripts/dev-logs.sh $(ARGS)
 
-stop: ## Stop all running services (Docker, Supabase, tmux log session)
+stop: ## Stop all running services (Docker, tmux log session)
 	-cd backend && docker compose down
-	-supabase stop --no-backup
 	-tmux kill-session -t dev-stack 2>/dev/null
 
 check-config: ## Show and validate iOS xcconfig + backend .env (no services needed)
@@ -90,20 +89,15 @@ backend-test: ## Backend pytest + coverage (same env/flags as Backend CI test jo
 			--cov-report=term-missing:skip-covered && \
 		uv run coverage report --skip-covered --show-missing
 
-backend-integration-test: ## Run backend integration tests against local Supabase (starts stack if needed)
+backend-integration-test: ## Run backend integration tests against PostgreSQL (requires docker compose)
 	@echo "── Backend integration tests ────────────────────────────────────"
-	@if ! supabase status 2>/dev/null | grep -q 'API URL'; then \
-		echo "Local Supabase stack not running — starting it now..."; \
-		supabase start; \
-	else \
-		echo "Local Supabase stack already running."; \
-	fi
-	@eval "$$(supabase status -o env | sed 's/="\(.*\)"/=\1/')" && \
-		cd backend && uv sync --frozen && \
+	@cd backend && docker compose up -d db
+	@echo "Waiting for PostgreSQL..."
+	@sleep 5
+	cd backend && uv sync --frozen && \
 		ENVIRONMENT=ci LOG_JSON=false RATE_LIMIT_ENABLED=false \
-		SUPABASE_URL=$$API_URL \
-		SUPABASE_PUBLIC_ANON_KEY=$$ANON_KEY \
-		SUPABASE_SERVICE_ROLE_KEY=$$SERVICE_ROLE_KEY \
+		DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/postgres_test \
+		uv run alembic upgrade head && \
 		uv run pytest tests/integration/ -v -m integration --tb=short
 
 lint: ## Same linters as CI: backend (ruff + mypy via uv) + iOS SwiftLint

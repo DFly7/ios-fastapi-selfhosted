@@ -1,31 +1,30 @@
-"""Shared JWT mock data and dependency overrides for API route tests."""
+"""Shared JWT mock data for API route tests."""
 
-from unittest.mock import MagicMock
+import time
+import uuid
 
-from app.core.auth import AuthenticatedClient
+import jwt
 
-FAKE_USER_ID = "00000000-0000-0000-0000-000000000001"
-FAKE_TOKEN = "mock.jwt.token"
-
-MOCK_AUTH_DATA = {
-    "token": FAKE_TOKEN,
-    "payload": {
-        "sub": FAKE_USER_ID,
-        "email": "test@example.com",
-        "aud": "authenticated",
-        "role": "authenticated",
-    },
-}
+TEST_JWT_SECRET = "testsecretatleast32charslong1234"
 
 
-def override_verify_jwt() -> dict:
-    return MOCK_AUTH_DATA
+def make_test_token(user_id: uuid.UUID | None = None, expired: bool = False) -> str:
+    """Generate a test JWT token with HS256."""
+    uid = str(user_id or uuid.uuid4())
+    exp = int(time.time()) + (-10 if expired else 3600)
+    return jwt.encode(
+        {
+            "sub": uid,
+            "aud": "authenticated",
+            "type": "access",
+            "email": f"{uid[:8]}@test.example",
+            "exp": exp,
+        },
+        TEST_JWT_SECRET,
+        algorithm="HS256",
+    )
 
 
-def notes_auth_override(mock_supabase: MagicMock):
-    async def _override() -> AuthenticatedClient:
-        return AuthenticatedClient.model_construct(
-            client=mock_supabase, payload=MOCK_AUTH_DATA["payload"]
-        )
-
-    return _override
+def auth_header(user_id: uuid.UUID | None = None) -> dict[str, str]:
+    """Return Authorization header dict with a test JWT token."""
+    return {"Authorization": f"Bearer {make_test_token(user_id)}"}

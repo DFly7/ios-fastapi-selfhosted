@@ -1,9 +1,13 @@
+"""Integration tests for auth endpoints with real SQLAlchemy ORM."""
+
 import pytest
+
+pytestmark = pytest.mark.integration
 
 
 @pytest.mark.asyncio
-@pytest.mark.integration
 async def test_register_and_login(client):
+    """Register a new user and verify credentials work for login."""
     resp = await client.post(
         "/api/v1/auth/register",
         json={"email": "alice@example.com", "password": "Password123!"},
@@ -33,8 +37,8 @@ async def test_register_and_login(client):
 
 
 @pytest.mark.asyncio
-@pytest.mark.integration
 async def test_refresh_token_rotation(client):
+    """Verify refresh token rotation and invalidation."""
     resp = await client.post(
         "/api/v1/auth/register",
         json={"email": "bob@example.com", "password": "Password123!"},
@@ -51,8 +55,8 @@ async def test_refresh_token_rotation(client):
 
 
 @pytest.mark.asyncio
-@pytest.mark.integration
 async def test_logout_invalidates_token(client):
+    """Verify logout invalidates refresh token."""
     resp = await client.post(
         "/api/v1/auth/register",
         json={"email": "carol@example.com", "password": "Password123!"},
