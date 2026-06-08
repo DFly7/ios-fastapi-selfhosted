@@ -19,16 +19,12 @@ struct StarterAppApp: App {
         Self.configurePostHogIfNeeded()
         Self.configureRevenueCat()
 
-        guard let url = URL(string: APIConfig.supabaseURL) else {
-            fatalError("Invalid Supabase URL in config")
-        }
         _authService = State(
-            initialValue: AuthService(supabaseURL: url, supabaseAnonKey: APIConfig.supabaseAnonKey)
+            initialValue: AuthService(backendURL: URL(string: APIConfig.backendURL)!)
         )
-        let supabaseHost = url.host ?? url.absoluteString
         let posthogOn = APIConfig.isPostHogConfigured
         AppLog.general.info(
-            "App init — Supabase host=\(supabaseHost, privacy: .public), PostHog=\(posthogOn, privacy: .public)"
+            "App init — Backend=\(APIConfig.backendURL, privacy: .public), PostHog=\(posthogOn, privacy: .public)"
         )
     }
 
@@ -59,7 +55,7 @@ struct StarterAppApp: App {
             RootView()
                 .environment(authService)
                 .environment(purchaseService)
-                // Sync RevenueCat identity whenever the Supabase user changes.
+                // Sync RevenueCat identity whenever the authenticated user changes.
                 // Fires on sign-in, sign-out, and the initial session check.
                 // Runs before any purchase UI can be shown so RC never writes
                 // an entitlement to an anonymous device ID.
@@ -76,9 +72,6 @@ struct StarterAppApp: App {
                     AppLog.general.info(
                         "Open URL scheme=\(scheme, privacy: .public) host=\(host, privacy: .public)"
                     )
-                    Task { @MainActor in
-                        await authService.handleIncomingURL(url)
-                    }
                 }
         }
     }

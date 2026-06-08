@@ -15,7 +15,6 @@ import PackageDescription
             // products root, where the Tuist-generated CpResource phase looks
             // for them. With .framework those bundles end up embedded inside the
             // dynamic framework and the copy phase fails with "No such file".
-            "Supabase": .staticFramework,
             "PostHog": .staticFramework,
             "RevenueCat": .staticFramework,
         ]
@@ -25,10 +24,6 @@ import PackageDescription
 let package = Package(
     name: "StarterAppPackages",
     dependencies: [
-        .package(
-            url: "https://github.com/supabase-community/supabase-swift.git",
-            from: "2.5.1"
-        ),
         .package(
             url: "https://github.com/PostHog/posthog-ios.git",
             from: "3.0.0"

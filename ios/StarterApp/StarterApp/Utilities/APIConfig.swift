@@ -1,5 +1,5 @@
 //
-//  Reads Backend URL, Supabase URL, and Supabase anon key from Info.plist.
+//  Reads Backend URL and other config from Info.plist.
 //  Values are supplied by Config-Debug / Config-Release .xcconfig at build time.
 //
 
@@ -26,21 +26,7 @@ enum APIConfig {
         return url
     }()
 
-    static let supabaseURL: String = {
-        guard let url = infoDictionary["SupabaseURL"] as? String, !url.isEmpty else {
-            fatalError("SupabaseURL is invalid or missing in Info.plist")
-        }
-        return url
-    }()
-
-    static let supabaseAnonKey: String = {
-        guard let key = infoDictionary["SupabaseAnonKey"] as? String, !key.isEmpty else {
-            fatalError("SupabaseAnonKey is invalid or missing in Info.plist")
-        }
-        return key
-    }()
-
-    /// Custom URL scheme for OAuth / magic-link redirects (must match Supabase redirect allow list).
+    /// Custom URL scheme for OAuth / magic-link redirects.
     ///
     /// Derived at runtime from `CFBundleURLTypes` in Info.plist, which is populated from
     /// `PRODUCT_BUNDLE_IDENTIFIER` by Project.swift. This means renaming the app bundle

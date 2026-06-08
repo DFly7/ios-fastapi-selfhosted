@@ -30,13 +30,11 @@ let project = Project(
                 ]),
                 // Runtime URLs and keys — values injected from xcconfig
                 "BackendURL": "$(BACKEND_URL)",
-                "SupabaseURL": "$(SUPABASE_URL)",
-                "SupabaseAnonKey": "$(SUPABASE_ANON_KEY)",
                 "PostHogAPIKey": "$(POSTHOG_API_KEY)",
                 "PostHogHost": "$(POSTHOG_HOST)",
                 "PostHogEnabled": "$(POSTHOG_ENABLED)",
                 "RevenueCatAPIKey": "$(REVENUECAT_API_KEY)",
-                // Supabase auth deep-link redirect scheme.
+                // Auth redirect scheme.
                 // Uses PRODUCT_BUNDLE_IDENTIFIER so renaming the app bundle
                 // automatically keeps the scheme in sync. APIConfig reads this
                 // at runtime from CFBundleURLTypes — no hardcoded value in Swift.
@@ -71,7 +69,6 @@ let project = Project(
             ],
             entitlements: .file(path: "StarterApp.entitlements"),
             dependencies: [
-                .external(name: "Supabase"),
                 .external(name: "PostHog"),
                 .external(name: "RevenueCat"),
             ],
