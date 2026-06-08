@@ -7,3 +7,6 @@
 
 # Cursor: optional local MCP config (tokens); team template is .cursor/mcp.json.example
 .cursor/mcp.json
+
+# Environment variables
+.env

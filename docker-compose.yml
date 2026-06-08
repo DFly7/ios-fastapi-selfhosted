@@ -20,7 +20,6 @@ services:
   backend:
     build:
       context: ./backend
-      target: production
     restart: unless-stopped
     depends_on:
       db:
