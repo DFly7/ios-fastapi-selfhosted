@@ -1,69 +1,79 @@
-"""Notes CRUD router — demonstrates POST (201), GET, PATCH, DELETE (204) with auth.
+from __future__ import annotations
 
-Every endpoint requires a valid JWT (`get_authenticated_client`).
-RLS on the `notes` table provides a second layer: even if a bug leaked the wrong
-user_id into a query, Postgres would reject the row.
-"""
-
-from uuid import UUID
+import uuid
 
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.auth import AuthenticatedClient, get_authenticated_client
+from app.core.auth import verify_jwt
+from app.db.session import get_db
+from app.repositories import notes_repo
 from app.schemas.notes import NoteIn, NoteOut, NoteUpdate
-from app.services import notes_service
+from app.services.notes_service import NotesLimitExceeded, create_user_note, update_user_note, delete_user_note
 
 router = APIRouter(prefix="/me/notes", tags=["notes"])
 
 
+def _user_id(auth: dict = Depends(verify_jwt)) -> uuid.UUID:
+    """Extract and convert user_id from JWT payload."""
+    return uuid.UUID(auth["payload"]["sub"])
+
+
 @router.get("", response_model=list[NoteOut])
 async def list_notes(
-    auth: AuthenticatedClient = Depends(get_authenticated_client),
-) -> list[NoteOut]:
+    db: AsyncSession = Depends(get_db),
+    user_id: uuid.UUID = Depends(_user_id),
+):
     """Return all notes owned by the signed-in user, newest first."""
-    return await notes_service.list_user_notes(auth.client, auth.payload["sub"])
+    return await notes_repo.list_notes(db, user_id)
 
 
 @router.post("", response_model=NoteOut, status_code=status.HTTP_201_CREATED)
 async def create_note(
-    payload: NoteIn,
-    auth: AuthenticatedClient = Depends(get_authenticated_client),
-) -> NoteOut:
+    body: NoteIn,
+    db: AsyncSession = Depends(get_db),
+    user_id: uuid.UUID = Depends(_user_id),
+):
     """Create a new note. Returns 201 with the created resource."""
-    return await notes_service.create_user_note(auth.client, auth.payload["sub"], payload)
+    try:
+        return await create_user_note(db, user_id, body)
+    except NotesLimitExceeded as e:
+        raise HTTPException(status_code=422, detail=str(e))
 
 
 @router.get("/{note_id}", response_model=NoteOut)
 async def get_note(
-    note_id: UUID,
-    auth: AuthenticatedClient = Depends(get_authenticated_client),
-) -> NoteOut:
+    note_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user_id: uuid.UUID = Depends(_user_id),
+):
     """Return a single note by ID (must belong to the signed-in user)."""
-    note = await notes_service.get_user_note(auth.client, note_id, auth.payload["sub"])
+    note = await notes_repo.get_note(db, note_id, user_id)
     if not note:
-        raise HTTPException(status_code=404, detail="Note not found.")
+        raise HTTPException(status_code=404, detail="Note not found")
     return note
 
 
 @router.patch("/{note_id}", response_model=NoteOut)
 async def update_note(
-    note_id: UUID,
-    payload: NoteUpdate,
-    auth: AuthenticatedClient = Depends(get_authenticated_client),
-) -> NoteOut:
+    note_id: uuid.UUID,
+    body: NoteUpdate,
+    db: AsyncSession = Depends(get_db),
+    user_id: uuid.UUID = Depends(_user_id),
+):
     """Partially update a note — only supplied fields are changed (PATCH semantics)."""
-    note = await notes_service.update_user_note(auth.client, note_id, auth.payload["sub"], payload)
+    note = await update_user_note(db, note_id, user_id, body)
     if not note:
-        raise HTTPException(status_code=404, detail="Note not found.")
+        raise HTTPException(status_code=404, detail="Note not found")
     return note
 
 
 @router.delete("/{note_id}", status_code=status.HTTP_204_NO_CONTENT)
 async def delete_note(
-    note_id: UUID,
-    auth: AuthenticatedClient = Depends(get_authenticated_client),
-) -> None:
+    note_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+    user_id: uuid.UUID = Depends(_user_id),
+):
     """Delete a note. Returns 204 No Content on success."""
-    deleted = await notes_service.delete_user_note(auth.client, note_id, auth.payload["sub"])
-    if not deleted:
-        raise HTTPException(status_code=404, detail="Note not found.")
+    if not await delete_user_note(db, note_id, user_id):
+        raise HTTPException(status_code=404, detail="Note not found")

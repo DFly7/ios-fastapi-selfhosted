@@ -1,43 +1,42 @@
-# Service layer for notes.
-# Pattern: one file per use-case / aggregate.
-# Services orchestrate one or more repositories and contain business logic.
-# Keep repository calls here so routers stay thin (validate input → call service → return schema).
-#
-# Add further business rules here rather than in the router or repo, for example:
-#   - strip / sanitise note content before persistence
-#   - fan out to a notification or search-index service after a write
+from __future__ import annotations
 
-from uuid import UUID
+import uuid
 
-from supabase import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.db.models import Note
 from app.exceptions import NotesLimitExceeded
 from app.repositories import notes_repo
-from app.schemas.notes import NoteIn, NoteOut, NoteUpdate
+from app.schemas.notes import NoteIn, NoteUpdate
 
 MAX_NOTES_PER_USER = 5
 
 
-async def list_user_notes(client: AsyncClient, user_id: UUID) -> list[NoteOut]:
-    return await notes_repo.list_notes(client, user_id)
+async def list_user_notes(db: AsyncSession, user_id: uuid.UUID) -> list[Note]:
+    """Return all notes owned by *user_id*."""
+    return await notes_repo.list_notes(db, user_id)
 
 
-async def get_user_note(client: AsyncClient, note_id: UUID, user_id: UUID) -> NoteOut | None:
-    return await notes_repo.get_note(client, note_id, user_id)
+async def get_user_note(db: AsyncSession, note_id: uuid.UUID, user_id: uuid.UUID) -> Note | None:
+    """Return a single note by ID if it belongs to *user_id*."""
+    return await notes_repo.get_note(db, note_id, user_id)
 
 
-async def create_user_note(client: AsyncClient, user_id: UUID, payload: NoteIn) -> NoteOut:
-    current = await notes_repo.count_notes(client, user_id)
+async def create_user_note(db: AsyncSession, user_id: uuid.UUID, data: NoteIn) -> Note:
+    """Create a new note, enforcing the per-user limit."""
+    current = await notes_repo.count_notes(db, user_id)
     if current >= MAX_NOTES_PER_USER:
         raise NotesLimitExceeded(MAX_NOTES_PER_USER)
-    return await notes_repo.create_note(client, user_id, payload)
+    return await notes_repo.create_note(db, user_id, data)
 
 
 async def update_user_note(
-    client: AsyncClient, note_id: UUID, user_id: UUID, payload: NoteUpdate
-) -> NoteOut | None:
-    return await notes_repo.update_note(client, note_id, user_id, payload)
+    db: AsyncSession, note_id: uuid.UUID, user_id: uuid.UUID, data: NoteUpdate
+) -> Note | None:
+    """Update a note if it belongs to *user_id*."""
+    return await notes_repo.update_note(db, note_id, user_id, data)
 
 
-async def delete_user_note(client: AsyncClient, note_id: UUID, user_id: UUID) -> bool:
-    return await notes_repo.delete_note(client, note_id, user_id)
+async def delete_user_note(db: AsyncSession, note_id: uuid.UUID, user_id: uuid.UUID) -> bool:
+    """Delete a note if it belongs to *user_id*."""
+    return await notes_repo.delete_note(db, note_id, user_id)

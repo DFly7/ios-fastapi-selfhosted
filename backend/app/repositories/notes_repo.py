@@ -1,82 +1,62 @@
-# Repository for the `notes` table.
-# Pattern: accept a Supabase AsyncClient as the first argument so the caller controls
-# the security context (user-scoped JWT client vs server-side service-role client).
-# Each function maps 1-to-1 to a database operation; business logic lives in the service.
+from __future__ import annotations
 
-from uuid import UUID
+import uuid
 
-from postgrest import CountMethod
-from supabase import AsyncClient
+from sqlalchemy import delete, func, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.schemas.notes import NoteIn, NoteOut, NoteUpdate
-
-_SELECT = "id, user_id, title, body, created_at, updated_at"
+from app.db.models import Note
+from app.schemas.notes import NoteIn, NoteUpdate
 
 
-async def count_notes(client: AsyncClient, user_id: UUID) -> int:
+async def count_notes(db: AsyncSession, user_id: uuid.UUID) -> int:
     """Return the number of notes owned by *user_id* without fetching row data."""
-    res = await (
-        client.table("notes")
-        .select("*", count=CountMethod.exact)
-        .eq("user_id", str(user_id))
-        .limit(0)
-        .execute()
+    result = await db.execute(select(func.count()).where(Note.user_id == user_id))
+    return result.scalar_one()
+
+
+async def list_notes(db: AsyncSession, user_id: uuid.UUID) -> list[Note]:
+    """Return all notes owned by *user_id*, ordered newest first."""
+    result = await db.execute(
+        select(Note).where(Note.user_id == user_id).order_by(Note.created_at.desc())
     )
-    return res.count or 0
+    return list(result.scalars().all())
 
 
-async def list_notes(client: AsyncClient, user_id: UUID) -> list[NoteOut]:
-    res = await (
-        client.table("notes")
-        .select(_SELECT)
-        .eq("user_id", str(user_id))
-        .order("created_at", desc=True)
-        .execute()
+async def get_note(db: AsyncSession, note_id: uuid.UUID, user_id: uuid.UUID) -> Note | None:
+    """Return a single note by ID if it belongs to *user_id*."""
+    result = await db.execute(
+        select(Note).where(Note.id == note_id, Note.user_id == user_id)
     )
-    return [NoteOut.model_validate(row) for row in (res.data or [])]
+    return result.scalar_one_or_none()
 
 
-async def get_note(client: AsyncClient, note_id: UUID, user_id: UUID) -> NoteOut | None:
-    res = await (
-        client.table("notes")
-        .select(_SELECT)
-        .eq("id", str(note_id))
-        .eq("user_id", str(user_id))
-        .limit(1)
-        .execute()
-    )
-    rows = res.data or []
-    return NoteOut.model_validate(rows[0]) if rows else None
-
-
-async def create_note(client: AsyncClient, user_id: UUID, payload: NoteIn) -> NoteOut:
-    res = await (
-        client.table("notes")
-        .insert({"user_id": str(user_id), "title": payload.title, "body": payload.body})
-        .execute()
-    )
-    return NoteOut.model_validate(res.data[0])
+async def create_note(db: AsyncSession, user_id: uuid.UUID, data: NoteIn) -> Note:
+    """Create and persist a new note."""
+    note = Note(user_id=user_id, **data.model_dump())
+    db.add(note)
+    await db.commit()
+    await db.refresh(note)
+    return note
 
 
 async def update_note(
-    client: AsyncClient, note_id: UUID, user_id: UUID, payload: NoteUpdate
-) -> NoteOut | None:
-    changes = payload.model_dump(exclude_none=True)
-    if not changes:
-        return await get_note(client, note_id, user_id)
-    res = await (
-        client.table("notes")
-        .update(changes)
-        .eq("id", str(note_id))
-        .eq("user_id", str(user_id))
-        .execute()
-    )
-    rows = res.data or []
-    return NoteOut.model_validate(rows[0]) if rows else None
+    db: AsyncSession, note_id: uuid.UUID, user_id: uuid.UUID, data: NoteUpdate
+) -> Note | None:
+    """Update a note if it belongs to *user_id*. Returns the updated note or None."""
+    values = data.model_dump(exclude_unset=True)
+    if values:
+        await db.execute(
+            update(Note).where(Note.id == note_id, Note.user_id == user_id).values(**values)
+        )
+        await db.commit()
+    return await get_note(db, note_id, user_id)
 
 
-async def delete_note(client: AsyncClient, note_id: UUID, user_id: UUID) -> bool:
-    res = await (
-        client.table("notes").delete().eq("id", str(note_id)).eq("user_id", str(user_id)).execute()
+async def delete_note(db: AsyncSession, note_id: uuid.UUID, user_id: uuid.UUID) -> bool:
+    """Delete a note if it belongs to *user_id*. Returns True if a row was deleted."""
+    result = await db.execute(
+        delete(Note).where(Note.id == note_id, Note.user_id == user_id)
     )
-    return bool(res.data)
+    await db.commit()
+    return result.rowcount > 0
