@@ -1,7 +1,7 @@
 from functools import lru_cache
 from typing import Annotated, Any
 
-from pydantic import Field, HttpUrl, computed_field, field_validator, model_validator
+from pydantic import AnyUrl, Field, HttpUrl, computed_field, field_validator, model_validator
 from pydantic.functional_validators import BeforeValidator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -43,11 +43,12 @@ class Settings(BaseSettings):
     rate_limit_enabled: bool = True
     rate_limit_default: str = Field(default="100/minute", min_length=1)
 
-    supabase_url: OptionalHttpUrl = None
-    supabase_public_anon_key: OptionalStr = None
+    database_url: AnyUrl = Field(..., description="asyncpg DSN")
+    jwt_secret: str = Field(..., description="HS256 signing secret — min 32 chars")
+    jwt_access_token_expire_seconds: int = 3600
+    jwt_refresh_token_expire_seconds: int = 2_592_000  # 30 days
 
     revenuecat_webhook_secret: OptionalStr = None
-    supabase_service_role_key: OptionalStr = None
 
     resend_api_key: OptionalStr = None
     resend_from_email: OptionalStr = Field(
