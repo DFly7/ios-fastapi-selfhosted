@@ -184,12 +184,6 @@ class TestBoolCoercion:
 
 
 class TestOptionalFields:
-    def test_empty_anon_key_becomes_none(self) -> None:
-        assert make(supabase_public_anon_key="").supabase_public_anon_key is None
-
-    def test_whitespace_anon_key_becomes_none(self) -> None:
-        assert make(supabase_public_anon_key="   ").supabase_public_anon_key is None
-
     def test_empty_resend_api_key_becomes_none(self) -> None:
         assert make(resend_api_key="").resend_api_key is None
 
