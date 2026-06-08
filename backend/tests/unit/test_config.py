@@ -184,19 +184,6 @@ class TestBoolCoercion:
 
 
 class TestOptionalFields:
-    def test_empty_supabase_url_becomes_none(self) -> None:
-        assert make(supabase_url="").supabase_url is None
-
-    def test_whitespace_supabase_url_becomes_none(self) -> None:
-        assert make(supabase_url="   ").supabase_url is None
-
-    def test_none_supabase_url_stays_none(self) -> None:
-        assert make(supabase_url=None).supabase_url is None
-
-    def test_valid_supabase_url_is_accepted(self) -> None:
-        s = make(supabase_url="https://abc.supabase.co")
-        assert s.supabase_url is not None
-
     def test_empty_anon_key_becomes_none(self) -> None:
         assert make(supabase_public_anon_key="").supabase_public_anon_key is None
 

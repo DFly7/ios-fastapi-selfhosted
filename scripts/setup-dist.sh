@@ -118,8 +118,6 @@ GIT_BASIC_AUTH=$(echo -n "${GH_USER}:${GH_PAT}" | base64)
 echo ""
 echo "  Runtime secrets (these go into Config-Release.xcconfig and GitHub Secrets):"
 echo ""
-ask "Production Supabase URL (e.g. https://yourproject.supabase.co):"; read -r SUPABASE_URL
-ask "Production Supabase Anon Key:"; read -r SUPABASE_ANON_KEY
 ask "Production backend URL — public HTTPS root for FastAPI (e.g. https://api.yourcompany.com):"; read -r PRODUCTION_BACKEND_URL
 [[ -n "$PRODUCTION_BACKEND_URL" ]] || die "Production backend URL is required for release builds."
 ask "PostHog API Key (leave blank to disable):"; read -r POSTHOG_API_KEY
@@ -161,8 +159,6 @@ DEVELOPMENT_TEAM = ${TEAM_ID}
 PRODUCT_BUNDLE_IDENTIFIER = ${BUNDLE_ID}
 
 BACKEND_URL = ${PRODUCTION_BACKEND_URL}
-SUPABASE_URL = ${SUPABASE_URL}
-SUPABASE_ANON_KEY = ${SUPABASE_ANON_KEY}
 
 POSTHOG_ENABLED = TRUE
 POSTHOG_API_KEY = ${POSTHOG_API_KEY}
@@ -234,8 +230,6 @@ cat << SECRETS
   APP_BUNDLE_ID                   = ${BUNDLE_ID}
   APP_NAME                        = ${APP_NAME}
   APPLE_ID                        = ${APPLE_ID_INPUT}
-  SUPABASE_URL                    = ${SUPABASE_URL}
-  SUPABASE_ANON_KEY               = ${SUPABASE_ANON_KEY}
   PRODUCTION_BACKEND_URL          = ${PRODUCTION_BACKEND_URL}
   POSTHOG_API_KEY                 = ${POSTHOG_API_KEY:-<leave empty if unused>}
   MATCH_GIT_URL                   = ${MATCH_GIT_URL}

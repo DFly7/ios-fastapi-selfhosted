@@ -8,7 +8,7 @@
 #
 # Required GitHub Secrets (printed by make setup-dist):
 #   DEVELOPMENT_TEAM, APP_BUNDLE_ID, APPLE_ID
-#   SUPABASE_URL, SUPABASE_ANON_KEY, PRODUCTION_BACKEND_URL
+#   PRODUCTION_BACKEND_URL
 #   POSTHOG_API_KEY (optional, may be empty)
 #   MATCH_GIT_URL, MATCH_PASSWORD, GIT_BASIC_AUTH
 #   APP_STORE_CONNECT_API_KEY_ID, APP_STORE_CONNECT_API_ISSUER_ID,
@@ -62,8 +62,6 @@ jobs:
           DEVELOPMENT_TEAM: ${{ secrets.DEVELOPMENT_TEAM }}
           APP_BUNDLE_ID: ${{ secrets.APP_BUNDLE_ID }}
           PRODUCTION_BACKEND_URL: ${{ secrets.PRODUCTION_BACKEND_URL }}
-          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
-          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
         run: |
           if [ -z "${PRODUCTION_BACKEND_URL}" ]; then
@@ -79,8 +77,6 @@ jobs:
           DEVELOPMENT_TEAM = ${DEVELOPMENT_TEAM}
           PRODUCT_BUNDLE_IDENTIFIER = ${APP_BUNDLE_ID}
           BACKEND_URL = ${PRODUCTION_BACKEND_URL}
-          SUPABASE_URL = ${SUPABASE_URL}
-          SUPABASE_ANON_KEY = ${SUPABASE_ANON_KEY}
           POSTHOG_ENABLED = ${POSTHOG_ENABLED_VAL}
           POSTHOG_API_KEY = ${POSTHOG_API_KEY}
           POSTHOG_HOST = https:/\$()/us.i.posthog.com
