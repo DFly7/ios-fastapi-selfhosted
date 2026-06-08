@@ -65,3 +65,16 @@ struct ProfileUpdate: Codable, Equatable {
         case avatarUrl = "avatar_url"
     }
 }
+
+/// Auth token pair returned by register, login, and refresh endpoints.
+struct TokenResponse: Codable, Equatable {
+    let accessToken: String
+    let refreshToken: String
+    let tokenType: String?
+
+    enum CodingKeys: String, CodingKey {
+        case accessToken = "access_token"
+        case refreshToken = "refresh_token"
+        case tokenType = "token_type"
+    }
+}

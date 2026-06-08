@@ -115,6 +115,12 @@ final class AuthService {
 
     // MARK: – HTTP helpers
 
+    private static let decoder: JSONDecoder = {
+        let d = JSONDecoder()
+        d.dateDecodingStrategy = .iso8601
+        return d
+    }()
+
     private func post<B: Encodable, R: Decodable>(path: String, body: B) async throws -> R {
         var req = URLRequest(url: backendURL.appendingPathComponent(path))
         req.httpMethod = "POST"
@@ -126,7 +132,7 @@ final class AuthService {
             let msg = (try? JSONDecoder().decode(APIErrorBody.self, from: data))?.detail
             throw AuthError.server(http.statusCode, msg ?? "Unknown error")
         }
-        return try JSONDecoder().decode(R.self, from: data)
+        return try Self.decoder.decode(R.self, from: data)
     }
 
     private func decodeJWTPayload(_ token: String) -> [String: Any]? {
@@ -166,15 +172,6 @@ final class AuthService {
 }
 
 // MARK: – Supporting types
-
-private struct TokenResponse: Decodable {
-    let accessToken: String
-    let refreshToken: String
-    enum CodingKeys: String, CodingKey {
-        case accessToken = "access_token"
-        case refreshToken = "refresh_token"
-    }
-}
 
 private struct APIErrorBody: Decodable { let detail: String }
 private struct EmptyResponse: Decodable {}

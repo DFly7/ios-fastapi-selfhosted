@@ -5,13 +5,13 @@ from datetime import UTC, datetime, timedelta
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, status
-from pydantic import BaseModel
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import verify_jwt
 from app.core.config import get_settings
 from app.db.session import get_db
 from app.repositories import profile_repo, refresh_token_repo, user_repo
+from app.schemas.auth import LoginRequest, RefreshRequest, RegisterRequest, TokenResponse
 from app.services.auth_service import (
     create_access_token,
     create_refresh_token_value,
@@ -23,27 +23,6 @@ from app.services.auth_service import (
 logger = structlog.get_logger(__name__)
 router = APIRouter(prefix="/auth", tags=["auth"])
 _settings = get_settings()
-
-
-class RegisterRequest(BaseModel):
-    email: str
-    password: str
-    display_name: str | None = None
-
-
-class LoginRequest(BaseModel):
-    email: str
-    password: str
-
-
-class RefreshRequest(BaseModel):
-    refresh_token: str
-
-
-class TokenResponse(BaseModel):
-    access_token: str
-    refresh_token: str
-    token_type: str = "bearer"
 
 
 def _make_token_response(db: AsyncSession, user_id: uuid.UUID):

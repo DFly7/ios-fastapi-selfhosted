@@ -43,6 +43,9 @@ OUTPUT_FILE = (
 SKIP_SCHEMAS: set[str] = {
     "HTTPValidationError",
     "ValidationError",
+    "RegisterRequest",
+    "LoginRequest",
+    "RefreshRequest",
 }
 
 
