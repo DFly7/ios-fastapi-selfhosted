@@ -20,7 +20,7 @@ struct StarterAppApp: App {
         Self.configureRevenueCat()
 
         _authService = State(
-            initialValue: AuthService(backendURL: URL(string: APIConfig.backendURL)!)
+            initialValue: AuthService(backendURL: APIConfig.backendURL)
         )
         let posthogOn = APIConfig.isPostHogConfigured
         AppLog.general.info(

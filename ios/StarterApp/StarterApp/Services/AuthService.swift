@@ -2,6 +2,7 @@ import Foundation
 import Observation
 import OSLog
 import PostHog
+import SwiftUI
 
 @Observable
 @MainActor
@@ -146,6 +147,28 @@ final class AuthService {
               let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return nil }
         return json
+    }
+
+    func signInWithApple(idToken: String, nonce: String) async {
+        isLoading = true; errorMessage = nil; infoMessage = nil
+        defer { isLoading = false }
+        errorMessage = "Apple Sign In is not yet implemented."
+    }
+
+    func signInWithGoogle() async {
+        isLoading = true; errorMessage = nil; infoMessage = nil
+        defer { isLoading = false }
+        errorMessage = "Google Sign In is not yet implemented."
+    }
+
+    func sendMagicLink(email: String) async {
+        isLoading = true; errorMessage = nil; infoMessage = nil
+        defer { isLoading = false }
+        errorMessage = "Magic Link is not yet implemented."
+    }
+
+    static func userFacingMessage(for error: Error) -> String {
+        error.localizedDescription
     }
 
     private func friendlyMessage(_ error: Error) -> String {

@@ -84,10 +84,10 @@ check-models: ## Dry-run: exit 1 if GeneratedModels.swift is out of sync (use in
 backend-test: ## Backend pytest + coverage (same env/flags as Backend CI test job)
 	cd backend && uv sync --frozen && \
 		ENVIRONMENT=ci LOG_JSON=false RATE_LIMIT_ENABLED=false \
-		uv run pytest tests/ -v --tb=short -m "not integration" \
+		uv run python -m pytest tests/ -v --tb=short -m "not integration" \
 			--cov=app \
 			--cov-report=term-missing:skip-covered && \
-		uv run coverage report --skip-covered --show-missing
+		uv run python -m coverage report --skip-covered --show-missing
 
 backend-integration-test: ## Run backend integration tests against PostgreSQL (requires docker compose)
 	@echo "── Backend integration tests ────────────────────────────────────"
@@ -97,11 +97,11 @@ backend-integration-test: ## Run backend integration tests against PostgreSQL (r
 	cd backend && uv sync --frozen && \
 		ENVIRONMENT=ci LOG_JSON=false RATE_LIMIT_ENABLED=false \
 		DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/postgres_test \
-		uv run alembic upgrade head && \
-		uv run pytest tests/integration/ -v -m integration --tb=short
+		uv run python -m alembic upgrade head && \
+		uv run python -m pytest tests/integration/ -v -m integration --tb=short
 
 lint: ## Same linters as CI: backend (ruff + mypy via uv) + iOS SwiftLint
-	cd backend && uv sync --frozen && uv run ruff check . && uv run ruff format --check . && uv run mypy app
+	cd backend && uv sync --frozen && uv run python -m ruff check . && uv run python -m ruff format --check . && uv run python -m mypy app
 	cd ios/StarterApp && \
 	  if command -v mise >/dev/null 2>&1; then \
 	    mise exec -- swiftlint lint --strict --config .swiftlint.yml; \
