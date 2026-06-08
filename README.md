@@ -183,7 +183,7 @@ git rm scripts/rename-project.sh && git commit -m "chore: remove template rename
 ### 1. Install tools
 
 ```sh
-# mise manages Python, uv, Tuist, and the Supabase CLI at pinned versions
+# mise manages Python, uv, Tuist, and SwiftLint at pinned versions
 curl https://mise.run | sh
 mise install   # run from repo root
 ```
