@@ -7,7 +7,7 @@ alwaysApply: false
 # Backend (Python / FastAPI)
 
 - **Canonical detail:** **`AGENTS.md`** → *TDD and testing* → **Backend**, plus repo root **`Makefile`** (`make help`).
-- **Verify changes:** From repo root, **`make backend-test`** (unit only, `-m "not integration"`). Integration: **`tests/integration/`** with `integration` marker and Supabase env — see workflows and test docstrings, not the default `make` target.
+- **Verify changes:** From repo root, **`make backend-test`** (unit only, `-m "not integration"`). Integration: **`tests/integration/`** with `integration` marker — needs Docker Compose running and `DATABASE_URL` + `JWT_SECRET` env vars. See `make backend-integration-test`.
 - **Layout:** App code under **`backend/app/`**. Tests: **`tests/conftest.py`** (`client` fixture), **`tests/api/`**, **`tests/unit/`**, **`tests/integration/`**. Config in **`pyproject.toml`** (pytest, Ruff, mypy).
 - **Run tools:** Prefer **`uv run`** from **`backend/`** (e.g. `uv run pytest …`). Repo uses **`uv sync --frozen`** in CI.
 - **API ↔ iOS models:** After changing Pydantic schemas, **`make sync-models`** / **`make check-models`** from repo root.
