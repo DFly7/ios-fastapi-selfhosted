@@ -9,9 +9,9 @@ from sentry_sdk.integrations.starlette import StarletteIntegration
 from slowapi.middleware import SlowAPIMiddleware
 
 from app.api.v1.router import api_router
-from app.core.auth import close_jwk_http_client
 from app.core.config import get_settings
 from app.core.rate_limit import limiter
+from app.db.session import engine
 from app.exception_handlers import register_exception_handlers
 from app.logging_config import get_logger, setup_logging
 from app.middleware import AccessLogMiddleware, AuthContextMiddleware, RequestIDMiddleware
@@ -47,7 +47,7 @@ async def lifespan(app: FastAPI):
     )
     print("FastAPI app started. Docs: /docs | Redoc: /redoc | Health: /healthz")
     yield
-    await close_jwk_http_client()
+    await engine.dispose()
     logger.info("application_shutdown", app_name=settings.app_name)
 
 

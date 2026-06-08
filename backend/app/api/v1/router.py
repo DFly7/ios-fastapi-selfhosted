@@ -2,9 +2,9 @@
 
 Route handler convention — async def
 --------------------------------------
-All handlers that touch Supabase use ``async def`` and ``await`` every
-``.execute()`` call.  The project uses ``acreate_client`` (the async Supabase
-client), so the event loop is never blocked by database I/O.
+All handlers that touch the database use ``async def`` and ``await`` every
+database call. The project uses SQLAlchemy's AsyncSession, so the event loop
+is never blocked by database I/O.
 
 Pure utility handlers (``/ping``) that do no I/O keep plain ``def`` — there
 is nothing to await and FastAPI handles both in the same event loop without
@@ -23,12 +23,17 @@ feature #2 and beyond; inline routes are the exception, not the template.
 To protect all v1 routes: APIRouter(dependencies=[Depends(verify_jwt)])
 """
 
+import uuid as uuid_module
+
 from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.v1 import auth as auth_module
 from app.api.v1.notes import router as notes_router
 from app.api.v1.webhooks import router as webhooks_router
-from app.core.auth import AuthenticatedClient, get_authenticated_client, verify_jwt
+from app.core.auth import verify_jwt
+from app.db.session import get_db
+from app.repositories import profile_repo
 from app.schemas.profile import ProfileOut, ProfileUpdate
 
 api_router = APIRouter()
@@ -54,54 +59,47 @@ async def secure_test(auth_data: dict = Depends(verify_jwt)) -> dict:
 
 @api_router.get("/me/profile", response_model=ProfileOut)
 async def get_my_profile(
-    auth: AuthenticatedClient = Depends(get_authenticated_client),
+    auth: dict = Depends(verify_jwt),
+    db: AsyncSession = Depends(get_db),
 ) -> ProfileOut:
     """Load the signed-in user's row from `public.profiles`.
 
-    RLS is enforced via the user's JWT on PostgREST.
+    RLS is implicit via the user's database row.
     """
-    user_id = auth.payload["sub"]
-    res = await (
-        auth.client.table("profiles")
-        .select("id, display_name, avatar_url, created_at")
-        .eq("id", user_id)
-        .limit(1)
-        .execute()
-    )
-    rows = res.data or []
-    if not rows:
+    user_id = uuid_module.UUID(auth["payload"]["sub"])
+    profile = await profile_repo.get_profile(db, user_id)
+    if not profile:
         raise HTTPException(
             status_code=404,
             detail=(
-                "No profile row found. Run migrations and sign up again, or run "
-                "supabase db reset locally."
+                "No profile row found. Run migrations and sign up again."
             ),
         )
-    return ProfileOut.model_validate(rows[0])
+    return ProfileOut.model_validate(profile)
 
 
 @api_router.patch("/me/profile", response_model=ProfileOut)
 async def update_my_profile(
     payload: ProfileUpdate,
-    auth: AuthenticatedClient = Depends(get_authenticated_client),
+    auth: dict = Depends(verify_jwt),
+    db: AsyncSession = Depends(get_db),
 ) -> ProfileOut:
     """Partially update the signed-in user's profile (PATCH semantics).
 
     Only the fields included in the request body are changed. Omit a field to
     leave it unchanged. Returns the full updated profile row.
     """
-    user_id = auth.payload["sub"]
+    user_id = uuid_module.UUID(auth["payload"]["sub"])
     changes = payload.model_dump(exclude_none=True)
     if not changes:
         raise HTTPException(
             status_code=422,
             detail="Request body must include at least one field to update.",
         )
-    res = await auth.client.table("profiles").update(changes).eq("id", user_id).execute()
-    rows = res.data or []
-    if not rows:
+    updated = await profile_repo.update_profile(db, user_id, payload)
+    if not updated:
         raise HTTPException(status_code=404, detail="Profile not found.")
-    return ProfileOut.model_validate(rows[0])
+    return ProfileOut.model_validate(updated)
 
 
 # Example of including another feature router:

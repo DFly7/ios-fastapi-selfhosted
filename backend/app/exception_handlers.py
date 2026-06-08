@@ -8,7 +8,6 @@ import structlog
 from fastapi import Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from postgrest.exceptions import APIError as PostgrestAPIError
 from slowapi.errors import RateLimitExceeded
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -142,59 +141,6 @@ async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) 
     )
 
 
-async def postgrest_api_error_handler(request: Request, exc: PostgrestAPIError) -> JSONResponse:
-    request_id = getattr(request.state, "request_id", "unknown")
-    user_id = getattr(request.state, "user_id", None)
-
-    details = getattr(exc, "details", None) or (exc.args[0] if exc.args else {})
-    if isinstance(details, dict):
-        code = details.get("code")
-        msg = details.get("message", str(exc))
-    else:
-        code = getattr(exc, "code", None)
-        msg = str(exc)
-
-    if code == "42501":
-        logger.warning(
-            "rls_violation",
-            method=request.method,
-            path=str(request.url.path),
-            request_id=request_id,
-            user_id=user_id,
-            message=msg,
-        )
-        return JSONResponse(
-            status_code=status.HTTP_403_FORBIDDEN,
-            content={
-                "error": "You don't have permission to perform this action.",
-                "status_code": status.HTTP_403_FORBIDDEN,
-                "request_id": request_id,
-            },
-            headers={"X-Request-ID": request_id},
-        )
-
-    logger.error(
-        "postgrest_api_error",
-        error_type=type(exc).__name__,
-        code=code,
-        message=msg,
-        method=request.method,
-        path=str(request.url.path),
-        request_id=request_id,
-        user_id=user_id,
-        exc_info=True,
-    )
-    return JSONResponse(
-        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-        content={
-            "error": "Internal server error",
-            "status_code": status.HTTP_500_INTERNAL_SERVER_ERROR,
-            "request_id": request_id,
-        },
-        headers={"X-Request-ID": request_id},
-    )
-
-
 async def notes_limit_exceeded_handler(request: Request, exc: NotesLimitExceeded) -> JSONResponse:
     request_id = getattr(request.state, "request_id", "unknown")
     user_id = getattr(request.state, "user_id", None)
@@ -224,5 +170,4 @@ def register_exception_handlers(app) -> None:
     app.add_exception_handler(NotesLimitExceeded, notes_limit_exceeded_handler)
     app.add_exception_handler(StarletteHTTPException, http_exception_handler)
     app.add_exception_handler(RequestValidationError, validation_exception_handler)
-    app.add_exception_handler(PostgrestAPIError, postgrest_api_error_handler)
     app.add_exception_handler(Exception, unhandled_exception_handler)
