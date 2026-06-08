@@ -1,0 +1,51 @@
+services:
+
+  db:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  backend:
+    build:
+      context: ./backend
+      target: production
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+asyncpg://postgres:${POSTGRES_PASSWORD:-postgres}@db:5432/postgres
+      JWT_SECRET: ${JWT_SECRET}
+      JWT_ACCESS_TOKEN_EXPIRE_SECONDS: ${JWT_ACCESS_TOKEN_EXPIRE_SECONDS:-3600}
+      JWT_REFRESH_TOKEN_EXPIRE_SECONDS: ${JWT_REFRESH_TOKEN_EXPIRE_SECONDS:-2592000}
+      APP_NAME: ${APP_NAME:-Starter API}
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-*}
+      SENTRY_DSN: ${SENTRY_DSN:-}
+      REVENUECAT_WEBHOOK_SECRET: ${REVENUECAT_WEBHOOK_SECRET:-}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+    ports:
+      - "8000:8000"
+
+  adminer:
+    image: adminer:latest
+    restart: unless-stopped
+    depends_on:
+      - db
+    ports:
+      - "8080:8080"
+
+volumes:
+  postgres_data:
