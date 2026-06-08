@@ -2,11 +2,15 @@
 # scripts/ios-sim.sh — Build StarterApp and launch it on an iOS Simulator.
 #
 # Usage:
-#   ./scripts/ios-sim.sh                  # auto-picks newest iPhone sim
-#   ./scripts/ios-sim.sh --regen          # tuist install + generate first
-#   ./scripts/ios-sim.sh --udid <UDID>    # target a specific simulator
-#   ./scripts/ios-sim.sh --logs           # stream console after launch
-#   ./scripts/ios-sim.sh --regen --logs   # combine flags
+#   ./scripts/ios-sim.sh                        # auto-picks newest iPhone sim
+#   ./scripts/ios-sim.sh --regen                # tuist install + generate first
+#   ./scripts/ios-sim.sh --udid <UDID>          # target a specific simulator
+#   ./scripts/ios-sim.sh --logs                 # stream console after launch
+#   ./scripts/ios-sim.sh --headless             # no Simulator.app GUI (agent mode)
+#   ./scripts/ios-sim.sh --clean-state          # erase sim before run (clears Keychain)
+#   ./scripts/ios-sim.sh --screenshot out.png   # capture screenshot after launch
+#   ./scripts/ios-sim.sh --verify-launch 5      # fail if app crashes within 5s
+#   ./scripts/ios-sim.sh --headless --clean-state --verify-launch 5  # full agent mode
 
 set -euo pipefail
 
@@ -15,13 +19,21 @@ set -euo pipefail
 # ---------------------------------------------------------------------------
 REGEN=false
 LOGS=false
+HEADLESS=false
+CLEAN_STATE=false
+SCREENSHOT=""
+VERIFY_LAUNCH=0
 TARGET_UDID=""
 
 while [[ $# -gt 0 ]]; do
   case $1 in
-    --regen) REGEN=true;  shift ;;
-    --logs)  LOGS=true;   shift ;;
-    --udid)  TARGET_UDID="$2"; shift 2 ;;
+    --regen)          REGEN=true;          shift ;;
+    --logs)           LOGS=true;           shift ;;
+    --headless)       HEADLESS=true;       shift ;;
+    --clean-state)    CLEAN_STATE=true;    shift ;;
+    --screenshot)     SCREENSHOT="$2";     shift 2 ;;
+    --verify-launch)  VERIFY_LAUNCH="${2:-5}"; shift 2 ;;
+    --udid)           TARGET_UDID="$2";    shift 2 ;;
     -h|--help)
       sed -n '/^# Usage/,/^$/p' "$0" | sed 's/^# \{0,2\}//'
       exit 0 ;;
@@ -109,6 +121,16 @@ SIM_NAME=$(xcrun simctl list devices available | grep "$TARGET_UDID" | sed 's/ (
 echo "→ Simulator: ${SIM_NAME} (${TARGET_UDID})"
 
 # ---------------------------------------------------------------------------
+# Clean state — erase simulator to clear Keychain, caches, app data
+# ---------------------------------------------------------------------------
+if $CLEAN_STATE; then
+  echo "→ Erasing simulator state…"
+  xcrun simctl shutdown "$TARGET_UDID" 2>/dev/null || true
+  xcrun simctl erase "$TARGET_UDID"
+  echo "  Simulator erased."
+fi
+
+# ---------------------------------------------------------------------------
 # Build
 # ---------------------------------------------------------------------------
 echo "→ Building ${SCHEME} (Debug)…"
@@ -141,7 +163,9 @@ BUNDLE_ID=$(defaults read "$(pwd)/$APP_PATH/Info.plist" CFBundleIdentifier 2>/de
 # ---------------------------------------------------------------------------
 echo "→ Booting simulator…"
 xcrun simctl boot "$TARGET_UDID" 2>/dev/null || true   # already-booted is fine
-open -a Simulator --args -CurrentDeviceUDID "$TARGET_UDID"
+if ! $HEADLESS; then
+  open -a Simulator --args -CurrentDeviceUDID "$TARGET_UDID"
+fi
 
 echo "→ Installing ${BUNDLE_ID}…"
 xcrun simctl install "$TARGET_UDID" "$APP_PATH"
@@ -154,4 +178,30 @@ else
   xcrun simctl launch "$TARGET_UDID" "$BUNDLE_ID"
   echo ""
   echo "✓ ${BUNDLE_ID} running on ${SIM_NAME}"
+fi
+
+# ---------------------------------------------------------------------------
+# Screenshot — capture simulator screen to file
+# ---------------------------------------------------------------------------
+if [[ -n "$SCREENSHOT" ]]; then
+  sleep 2  # give app time to render
+  echo "→ Capturing screenshot to ${SCREENSHOT}…"
+  xcrun simctl io "$TARGET_UDID" screenshot "$SCREENSHOT"
+  echo "  ✓ Screenshot saved."
+fi
+
+# ---------------------------------------------------------------------------
+# Verify launch — poll for app process, fail if it crashed
+# ---------------------------------------------------------------------------
+if [[ "$VERIFY_LAUNCH" -gt 0 ]]; then
+  echo "→ Verifying app stayed alive for ${VERIFY_LAUNCH}s…"
+  sleep "$VERIFY_LAUNCH"
+  if xcrun simctl spawn "$TARGET_UDID" launchctl list 2>/dev/null | grep -q "$BUNDLE_ID"; then
+    echo "  ✓ App is running."
+  else
+    echo "  ✗ App is NOT running — may have crashed on launch."
+    echo "  Recent crash logs:"
+    find ~/Library/Logs/DiagnosticReports -name "StarterApp*" -newer "$APP_PATH" 2>/dev/null | head -3
+    exit 1
+  fi
 fi
