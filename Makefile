@@ -1,7 +1,7 @@
 # Run from the repo root: make <target>
 # Pass extra flags directly:  make dev ARGS="--regen --sim-logs"
 
-.PHONY: dev dev-logs stop check-config sync-models check-models ios-gen ios-run ios-build ios-test ios-test-ui lint backend-test backend-integration-test validate check-deps help
+.PHONY: dev dev-logs stop check-config sync-models check-models ios-gen ios-run ios-build ios-test ios-test-ui lint backend-test backend-integration-test validate validate-full smoke-test bootstrap check-deps help
 
 # Auto-detect latest available iPhone simulator; override with UDID: make ios-test SIM_ID=<udid>
 SIM_ID ?= $(shell xcrun simctl list devices available | grep -i iphone | tail -1 | grep -oEi '[0-9A-F-]{36}')
@@ -111,11 +111,11 @@ lint: ## Same linters as CI: backend (ruff + mypy via uv) + iOS SwiftLint
 
 # ── Validate (local CI-gate simulation) ──────────────────────────────────────
 
-validate: ## Run all checks in sequence: lint → type-check → model-sync → unit tests → iOS build
-	@echo "\n── 1/5  lint & type-check ──────────────────────────────────────"
-	@$(MAKE) lint
-	@echo "\n── 2/5  model-sync check ───────────────────────────────────────"
+validate: ## Run all checks in sequence: model-sync → lint → backend tests → iOS tests → iOS build
+	@echo "\n── 1/5  model-sync check ───────────────────────────────────────"
 	@$(MAKE) check-models
+	@echo "\n── 2/5  lint & type-check ──────────────────────────────────────"
+	@$(MAKE) lint
 	@echo "\n── 3/5  backend unit tests ─────────────────────────────────────"
 	@$(MAKE) backend-test
 	@echo "\n── 4/5  iOS unit tests ─────────────────────────────────────────"
@@ -124,10 +124,52 @@ validate: ## Run all checks in sequence: lint → type-check → model-sync → 
 	@$(MAKE) ios-build
 	@echo "\n✓  All checks passed — safe to push."
 
+validate-full: validate ## Full validation: validate + integration tests + smoke test
+	@echo "\n── 6/7  backend integration tests ──────────────────────────────"
+	@$(MAKE) backend-integration-test
+	@echo "\n── 7/7  smoke test ─────────────────────────────────────────────"
+	@bash scripts/smoke-test.sh
+	@echo "\n✓  Full validation passed."
+
+smoke-test: ## Run curl-based happy-path smoke test against running backend
+	@bash scripts/smoke-test.sh
+
 # ── Dependency check ─────────────────────────────────────────────────────────
 
 check-deps: ## Check all prerequisite tools are installed and running
 	@bash scripts/check-deps.sh
+
+# ── Bootstrap ────────────────────────────────────────────────────────────────
+
+bootstrap: ## First-time setup: copy .env files, generate JWT_SECRET, install tools + deps
+	@echo "\n── Bootstrapping project ──────────────────────────────────────"
+	@if [ ! -f .env ]; then \
+		cp .env.example .env; \
+		JWT=$$(openssl rand -hex 32); \
+		sed -i '' "s/change-me-generate-with-openssl-rand-hex-32/$$JWT/" .env; \
+		echo "  ✓ Created .env with generated JWT_SECRET"; \
+	else \
+		echo "  · .env already exists — skipping"; \
+	fi
+	@if [ ! -f backend/.env ]; then \
+		cp backend/.env.example backend/.env; \
+		JWT=$$(grep '^JWT_SECRET=' .env | cut -d= -f2); \
+		sed -i '' "s/change-me-generate-with-openssl-rand-hex-32/$$JWT/" backend/.env; \
+		echo "  ✓ Created backend/.env (JWT_SECRET synced from root)"; \
+	else \
+		echo "  · backend/.env already exists — skipping"; \
+	fi
+	@echo "\n── Installing tools (mise) ────────────────────────────────────"
+	@if command -v mise >/dev/null 2>&1; then \
+		mise install; \
+	else \
+		echo "  ⚠  mise not found — install from https://mise.jdx.dev then re-run"; \
+	fi
+	@echo "\n── Installing Python dependencies ─────────────────────────────"
+	cd backend && uv sync
+	@echo "\n── Checking all dependencies ──────────────────────────────────"
+	@bash scripts/check-deps.sh
+	@echo "\n✓  Bootstrap complete. Run 'make dev' to start the stack."
 
 # ── Help ─────────────────────────────────────────────────────────────────────
 
