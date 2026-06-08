@@ -20,8 +20,16 @@ from app.core.config import Settings, _empty_to_none
 
 
 def make(**kwargs) -> Settings:
-    """Construct a Settings instance with no .env file and explicit overrides."""
-    return Settings(_env_file=None, **kwargs)
+    """Construct a Settings instance with no .env file and explicit overrides.
+
+    Provides defaults for required fields (database_url, jwt_secret) unless overridden.
+    """
+    defaults = {
+        "database_url": "postgresql+asyncpg://localhost/test",
+        "jwt_secret": "test_secret_min_32_chars_long_12345",
+    }
+    defaults.update(kwargs)
+    return Settings(_env_file=None, **defaults)
 
 
 # ---------------------------------------------------------------------------
