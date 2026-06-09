@@ -62,6 +62,16 @@ Useful targets:
 
 See `Makefile` for UI tests, Tuist generation, and local dev scripts.
 
+## iOS Simulator (agent mode)
+
+The agent can build, launch, screenshot, read, and interact with the iOS app from the terminal using `idb` (Facebook iOS Development Bridge) or the `ios-simulator` MCP server.
+
+- **Launch headless:** `./scripts/ios-sim.sh --headless --clean-state --verify-launch 5 --screenshot /tmp/screen.png`
+- **Read screen (accessibility tree):** `idb ui describe-all --udid <UDID>` — returns JSON with every label, button, frame
+- **Tap / type / swipe:** `idb ui tap <x> <y>`, `idb ui text "string"`, `idb ui swipe <x1> <y1> <x2> <y2>`
+- **Screenshot:** `idb screenshot /tmp/screen.png` — then view the image to verify visually
+- **MCP tools:** The `ios-simulator` MCP server (`.cursor/mcp.json`, `.claude/settings.json`) exposes `ui_describe_all`, `ui_tap`, `ui_type`, `screenshot` as native tool calls
+
 ## Agent-only docs (not GitHub Pages)
 
 The **`docs/`** tree is for the **published site** (e.g. GitHub Pages). Do not put internal design specs or implementation plans there.

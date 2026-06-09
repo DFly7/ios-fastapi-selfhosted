@@ -4,15 +4,21 @@
       "command": "npx",
       "args": [
         "-y",
-        "@anthropic-ai/mcp-server-postgres",
+        "@modelcontextprotocol/server-postgres",
         "postgresql://postgres:postgres@localhost:5432/postgres"
       ]
     },
     "fetch": {
+      "command": "uvx",
+      "args": [
+        "mcp-server-fetch"
+      ]
+    },
+    "ios-simulator": {
       "command": "npx",
       "args": [
         "-y",
-        "@anthropic-ai/mcp-server-fetch"
+        "ios-simulator-mcp@1.6.0"
       ]
     }
   }

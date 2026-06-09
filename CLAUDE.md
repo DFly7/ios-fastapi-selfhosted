@@ -63,6 +63,31 @@ Target: Raspberry Pi running Docker (linux/arm64). Deployment is via GitHub Acti
 - Pi details are configured in GitHub Actions secrets (not in repo)
 - **Never** push directly to the Pi from a local terminal session
 
+## iOS Simulator (agent mode)
+
+The agent can build, launch, screenshot, read, and interact with the iOS app entirely from the terminal.
+
+**Launch headlessly:**
+```bash
+./scripts/ios-sim.sh --headless --clean-state --verify-launch 5 --screenshot /tmp/screen.png
+```
+
+**Read the screen** (accessibility tree via idb):
+```bash
+idb ui describe-all --udid $(xcrun simctl list devices booted -j | python3 -c "import sys,json; print(json.load(sys.stdin)['devices'].values().__iter__().__next__()[0]['udid'])")
+```
+
+**Interact** (tap, type, swipe):
+```bash
+idb ui tap <x> <y> --udid <UDID>
+idb ui text "hello" --udid <UDID>
+idb ui swipe <x1> <y1> <x2> <y2> --udid <UDID>
+```
+
+**Screenshot + visual verify:** `idb screenshot /tmp/screen.png` then use the Read tool to view the image.
+
+**MCP tools (ios-simulator):** `ui_describe_all`, `ui_tap`, `ui_type`, `screenshot` — available as native tool calls when the MCP server is running.
+
 ## Skills
 
 Detailed playbooks: `.agents/skills/<name>/SKILL.md`. Read the relevant skill before implementing when a task matches.
