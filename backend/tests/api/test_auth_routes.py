@@ -24,7 +24,7 @@ def test_register_rejects_password_over_72_chars() -> None:
 
 
 def test_register_rejects_password_too_short() -> None:
-    """POST /api/v1/auth/register with a 7-byte password must return 422."""
+    """POST /api/v1/auth/register with a 5-char password must return 422."""
     with TestClient(app) as client:
         response = client.post(
             "/api/v1/auth/register",
@@ -50,4 +50,6 @@ def test_register_accepts_password_at_max_length() -> None:
                 "password": "a" * 72,
             },
         )
-    assert response.status_code != 422
+    # 201 = registered, 409 = duplicate email, 500 = DB unavailable in unit suite.
+    # Any of these confirms schema validation passed (422 would mean it did not).
+    assert response.status_code in (201, 409, 500)

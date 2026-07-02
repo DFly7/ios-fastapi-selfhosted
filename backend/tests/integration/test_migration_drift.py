@@ -130,17 +130,33 @@ def _compare_metadata_sync(sync_conn):
 
 
 def _is_benign_server_default_diff(diff) -> bool:
-    """Return True for server_default representation diffs that are not real drift.
+    """Return True only for the specific known-benign server_default diffs.
 
-    Alembic's autogenerate sometimes reports server_default differences for
-    Boolean columns because the migration stores the raw SQL string (e.g.
-    ``'true'``) while SQLAlchemy's metadata uses a dialect-specific rendering.
-    These are safe to ignore on this schema.
+    Alembic autogenerate reports a ``modify_server_default`` diff for Boolean
+    columns whose migrations store the raw SQL string (``'true'`` / ``'false'``)
+    while SQLAlchemy metadata renders the dialect-native Python bool.  These are
+    harmless representation differences, not real schema drift.
+
+    Known benign pairs (table, column):
+      - users.is_active  — server_default='true'  (migration 001)
+      - profiles.is_pro  — server_default='false' (migration 002)
+
+    Any other ``modify_server_default`` diff (e.g. on a newly added column) must
+    NOT be silenced here — it must surface as a real test failure.
+
+    Alembic diff tuple layout for modify_server_default:
+      (directive, schema, table_name, column_name, existing_type, ...)
     """
+    # Known-benign (table, column) pairs for Boolean server_default string diffs.
+    _BENIGN_BOOL_DEFAULTS: set[tuple[str, str]] = {
+        ("users", "is_active"),
+        ("profiles", "is_pro"),
+    }
     try:
-        # diff is a tuple: ('modify_server_default', ...) or similar
         if diff[0] == "modify_server_default":
-            return True
+            table_name = diff[2]
+            column_name = diff[3]
+            return (table_name, column_name) in _BENIGN_BOOL_DEFAULTS
     except (IndexError, TypeError):
         pass
     return False

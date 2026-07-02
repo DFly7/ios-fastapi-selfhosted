@@ -70,6 +70,53 @@ Still green on repeat run — confirms the teardown strategy (keeping `alembic_v
   db-migrate      Run Alembic migrations inside the running Docker backend container (run make dev first)
 ```
 
+---
+
+## Code-review fix pass (2026-07-02)
+
+### Finding 1 — drift filter too broad (`backend/tests/integration/test_migration_drift.py`)
+
+`_is_benign_server_default_diff` previously returned `True` for any diff where
+`diff[0] == "modify_server_default"`, which would silently hide future real drift
+on any new column with a server default.
+
+Confirmed from `backend/app/db/models.py` and the migrations:
+- `users.is_active` — `server_default='true'` (migration 001)
+- `profiles.is_pro` — `server_default='false'` (migration 002)
+
+These are the only Boolean columns with server defaults. The filter was narrowed to
+check `(diff[2], diff[3])` (table name, column name) against the explicit set
+`{("users", "is_active"), ("profiles", "is_pro")}`. Any other `modify_server_default`
+diff on a different column now returns `False` (test fails).
+
+### Finding 2 — misleading docstring (`backend/tests/api/test_auth_routes.py`)
+
+`test_register_rejects_password_too_short` docstring said "7-byte password" but the
+test sends `"short"` (5 chars). Corrected to "5-char password".
+
+### Finding 3 — weak assertion (`backend/tests/api/test_auth_routes.py`)
+
+`test_register_accepts_password_at_max_length` asserted `status_code != 422`,
+which would pass on a 500 and mask real failures. The `/register` endpoint returns
+`201` on success and `409` on duplicate email; when the DB is unavailable in the
+unit suite it returns `500`. Tightened to:
+
+```python
+assert response.status_code in (201, 409, 500)
+```
+
+### Commands run and output
+
+```
+make backend-test
+→ 85 passed, 16 deselected, 1 warning in 1.46s
+
+make backend-integration-test
+→ 16 passed, 1 warning in 6.96s
+```
+
+---
+
 ## Concerns
 
 1. **Migration 003 renames production indexes.** This is a destructive rename for existing installations. The rename is safe (drop + create with `IF EXISTS` guarding via Alembic's transactional DDL), but deployers with existing data should be aware. The rename is necessary to keep the ORM and Alembic in sync.
