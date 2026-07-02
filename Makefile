@@ -1,7 +1,7 @@
 # Run from the repo root: make <target>
 # Pass extra flags directly:  make dev ARGS="--regen --sim-logs"
 
-.PHONY: dev dev-logs stop check-config sync-models check-models ios-gen ios-run ios-device ios-build ios-test ios-test-ui lint backend-test backend-integration-test validate validate-full smoke-test bootstrap check-deps help
+.PHONY: dev dev-logs stop check-config sync-models check-models ios-gen ios-run ios-device ios-build ios-test ios-test-ui lint backend-test backend-integration-test db-migrate validate validate-full smoke-test bootstrap check-deps help
 
 # Auto-detect latest available iPhone simulator; override with UDID: make ios-test SIM_ID=<udid>
 SIM_ID ?= $(shell xcrun simctl list devices available | grep -i iphone | tail -1 | grep -oEi '[0-9A-F-]{36}')
@@ -92,6 +92,11 @@ backend-test: ## Backend pytest + coverage (same env/flags as Backend CI test jo
 			--cov-report=term-missing:skip-covered && \
 		uv run python -m coverage report --skip-covered --show-missing
 
+db-migrate: ## Run Alembic migrations inside the running Docker backend container (run make dev first)
+	@docker compose ps backend --format '{{.State}}' 2>/dev/null | grep -q running \
+		|| (echo "Error: backend container is not running — start it with 'make dev' first"; exit 1)
+	docker compose exec backend uv run alembic upgrade head
+
 backend-integration-test: ## Run backend integration tests against PostgreSQL (requires docker compose)
 	@echo "── Backend integration tests ────────────────────────────────────"
 	@cd backend && docker compose up -d db
@@ -100,6 +105,7 @@ backend-integration-test: ## Run backend integration tests against PostgreSQL (r
 	cd backend && uv sync --frozen && \
 		ENVIRONMENT=ci LOG_JSON=false RATE_LIMIT_ENABLED=false \
 		DATABASE_URL=postgresql+asyncpg://postgres:postgres@localhost:5432/postgres_test \
+		JWT_SECRET=testsecretatleast32charslong1234 \
 		uv run python -m alembic upgrade head && \
 		uv run python -m pytest tests/integration/ -v -m integration --tb=short
 
