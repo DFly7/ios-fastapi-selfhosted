@@ -31,6 +31,7 @@ struct RootView: View {
                 .foregroundStyle(.secondary)
             Button("Sign In") { showingAuth = true }
                 .buttonStyle(.borderedProminent)
+                .accessibilityIdentifier("auth.openSignIn")
         }
         .padding()
     }

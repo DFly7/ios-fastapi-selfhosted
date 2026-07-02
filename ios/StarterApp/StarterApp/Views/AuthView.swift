@@ -35,6 +35,7 @@ struct AuthView: View {
                         .padding(12)
                         .background(.thinMaterial)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
+                        .accessibilityIdentifier("auth.email")
 
                     if authMode != .magicLink {
                         SecureField("Password", text: $password)
@@ -42,6 +43,7 @@ struct AuthView: View {
                             .padding(12)
                             .background(.thinMaterial)
                             .clipShape(RoundedRectangle(cornerRadius: 10))
+                            .accessibilityIdentifier("auth.password")
                     }
 
                     if let err = authService.errorMessage {
@@ -70,6 +72,7 @@ struct AuthView: View {
                         }
                     }
                     .buttonStyle(.borderedProminent)
+                    .accessibilityIdentifier("auth.submit")
                     .disabled(
                         email.isEmpty
                             || (authMode != .magicLink && password.isEmpty)
