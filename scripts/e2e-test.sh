@@ -20,6 +20,11 @@ SIM_ID="${SIM_ID:-}"
 if [[ -z "$SIM_ID" ]]; then
   SIM_ID=$(xcrun simctl list devices available | grep -i iphone | tail -1 | grep -oEi '[0-9A-F-]{36}')
 fi
+if [[ -z "$SIM_ID" ]]; then
+  echo "ERROR: No available iPhone simulator found."
+  echo "       Open Xcode → Settings → Platforms and install an iOS simulator runtime."
+  exit 1
+fi
 echo "  Using simulator: ${SIM_ID}"
 echo ""
 
@@ -41,7 +46,7 @@ echo ""
 echo "── Ensure E2E user ──"
 REGISTER_STATUS=$(curl -s -o /dev/null -w '%{http_code}' -X POST "${API}/auth/register" \
   -H "Content-Type: application/json" \
-  -d "{\"email\":\"${E2E_EMAIL}\",\"password\":\"${E2E_PASSWORD}\"}")
+  -d "{\"email\":\"${E2E_EMAIL}\",\"password\":\"${E2E_PASSWORD}\"}" || echo "000")
 if [[ "$REGISTER_STATUS" == "201" ]]; then
   echo "  OK: registered ${E2E_EMAIL}"
 elif [[ "$REGISTER_STATUS" == "409" ]]; then
