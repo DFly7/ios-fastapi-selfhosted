@@ -149,9 +149,12 @@ struct ContentView: View {
                     }
                 }
                 .disabled(viewModel.isCallingSecureTest)
+                .accessibilityIdentifier("home.secureTest")
 
                 if let result = viewModel.secureTestResult {
-                    Text(result.message).font(.subheadline)
+                    Text(result.message)
+                        .font(.subheadline)
+                        .accessibilityIdentifier("home.secureTestResult")
                     if let uid = result.userId {
                         Text("user_id: \(uid)")
                             .font(.caption.monospaced())
@@ -284,7 +287,9 @@ struct ContentView: View {
                     .padding(.vertical, 4)
                 } else {
                     VStack(alignment: .leading, spacing: 2) {
-                        Text(note.title).font(.subheadline)
+                        Text(note.title)
+                            .font(.subheadline)
+                            .accessibilityIdentifier("notes.row.\(note.title)")
                         Text(note.createdAt, format: .relative(presentation: .named))
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -312,12 +317,14 @@ struct ContentView: View {
                 HStack {
                     TextField("Note title", text: $newNoteTitle)
                         .textFieldStyle(.roundedBorder)
+                        .accessibilityIdentifier("notes.titleField")
                     Button("Add") {
                         let title = newNoteTitle
                         newNoteTitle = ""
                         isShowingNoteComposer = false
                         Task { await viewModel.createNote(title: title, auth: authService) }
                     }
+                    .accessibilityIdentifier("notes.save")
                     .disabled(newNoteTitle.trimmingCharacters(in: .whitespaces).isEmpty || viewModel.isCreatingNote)
                     Button("Cancel") { newNoteTitle = ""; isShowingNoteComposer = false }
                         .foregroundStyle(.secondary)
@@ -333,6 +340,7 @@ struct ContentView: View {
                     }
                 }
                 .disabled(viewModel.isCreatingNote)
+                .accessibilityIdentifier("notes.add")
             }
 
             if let error = viewModel.notesError {
