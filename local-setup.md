@@ -1,159 +1,124 @@
 # Local Dev Runbook
 
-## Prerequisites
+How to run the full stack locally — PostgreSQL + FastAPI (Docker Compose) plus the iOS app
+on the Simulator or a physical iPhone. Auth is self-hosted (bcrypt + HS256 JWT); there is no
+Supabase in this stack.
 
-The scripts and manual steps below require the following tools to be installed:
+## Prerequisites
 
 | Tool | Install |
 |------|---------|
-| **mise** | `curl https://mise.run \| sh` — then `mise install` from the repo root to get Python, uv, Tuist, and the Supabase CLI at the pinned versions in `.mise.toml` |
-| **Docker Desktop** | https://www.docker.com/products/docker-desktop/ |
-| **instatunnel** | `npm install -g instatunnel` (requires Node.js) — default choice in `run.sh` for exposing local ports to HTTPS URLs so a **physical** iOS device can reach Supabase and the backend. **The Simulator does not need a tunnel** — use `http://127.0.0.1` URLs (see [Tunnel alternatives](#tunnel-alternatives-ngrok-and-cloudflare-tunnel)). For other tools, use [ngrok](https://ngrok.com/) or [Cloudflare Tunnel](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/) (`cloudflared`) instead — same idea, different CLI. |
+| **mise** | `curl https://mise.run \| sh` — then `mise install` from the repo root to get Python, uv, and Tuist at the versions pinned in `.mise.toml` |
+| **Docker Desktop** | https://www.docker.com/products/docker-desktop/ (runs Postgres + FastAPI + Adminer) |
+| **ngrok** *(physical device only)* | `brew install ngrok`, then `ngrok config add-authtoken <token>` once. Needed so a phone can reach the backend over HTTPS. |
+| **libimobiledevice** *(optional)* | `brew install libimobiledevice` — for streaming physical-device logs via `ios-device.sh --logs` (requires USB). |
 
----
-
-## Tunnel alternatives: ngrok and Cloudflare Tunnel
-
-Use this whenever you do not want to rely on instatunnel, or to compare against the docs above.
-
-### iOS Simulator (no tunnel)
-
-The Simulator shares the Mac’s network stack. Point `BACKEND_URL` and `SUPABASE_URL` in your xcconfig at local HTTP URLs, for example:
-
-- `BACKEND_URL` → `http://127.0.0.1:8000`
-- `SUPABASE_URL` → `http://127.0.0.1:54321`
-
-No HTTPS tunnel process is required. If App Transport Security blocks plain HTTP in your build, add or adjust the Debug ATS exception your project already uses for local dev.
-
-### Physical device — same ports, different tunnel CLI
-
-You still need **two** public HTTPS endpoints: one forwarding to **54321** (Supabase API) and one to **8000** (FastAPI). After each tunnel prints its URL, put them in `Config-Debug.xcconfig` as `SUPABASE_URL` and `BACKEND_URL` (same shape as the instatunnel hostnames).
-
-**ngrok** (install from [ngrok.com](https://ngrok.com/), authenticate once with your authtoken):
-
-```sh
-# Two terminals (or two ngrok sessions with different ports)
-ngrok http 54321
-ngrok http 8000
-```
-
-Each command shows an `https://….ngrok-free.app` (or similar) forwarding URL. Copy the Supabase tunnel URL into `SUPABASE_URL` and the backend tunnel URL into `BACKEND_URL`. On the free tier, URLs change each run unless you use a [reserved domain](https://ngrok.com/docs/guides/how-to-set-up-a-reserved-domain/).
-
-**Cloudflare Tunnel** (install [`cloudflared`](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/install-and-setup/installation/)):
-
-```sh
-# Two terminals — quick tunnels, no Cloudflare account required
-cloudflared tunnel --url http://127.0.0.1:54321
-cloudflared tunnel --url http://127.0.0.1:8000
-```
-
-Each prints a `https://….trycloudflare.com` URL. Use those for `SUPABASE_URL` and `BACKEND_URL` respectively. URLs are ephemeral per run unless you configure a [named tunnel and DNS](https://developers.cloudflare.com/cloudflare-one/connections/connect-apps/).
-
-If you use ngrok or Cloudflare instead of instatunnel, replace **Tab 3** and **Tab 4** in [Running manually](#running-manually-4-terminal-tabs) with the commands above, and skip editing `SUPA_SUBDOMAIN` / `BACKEND_SUBDOMAIN` in `run.sh` unless you customize the scripted flow.
+The Simulator needs **no** tunnel — it shares the Mac's network and talks to `http://localhost:8000` directly.
 
 ---
 
 ## One-time setup
 
-1. **Backend env** — copy `backend/.env.example` → `backend/.env`.
-   Fill in `SUPABASE_PUBLIC_ANON_KEY` after running `supabase start` for the first time:
-   ```sh
-   supabase start
-   supabase status   # copy the anon key from here
-   ```
-   Paste it into `backend/.env` at `SUPABASE_PUBLIC_ANON_KEY=`.
+The fastest path is `make bootstrap`, which copies both `.env` files, generates a `JWT_SECRET`,
+and installs tool + Python dependencies:
 
-2. **Install Tuist** (if not already installed):
+```sh
+make bootstrap
+```
+
+Or do it by hand:
+
+1. **Env files** — copy the templates and set a JWT secret:
    ```sh
-   curl -Ls https://install.tuist.io | bash
+   cp .env.example .env
+   cp backend/.env.example backend/.env
+   # generate a secret and put it in JWT_SECRET (both files use the same value)
+   openssl rand -hex 32
+   ```
+   Root `.env` holds Docker Compose vars; `backend/.env` holds app config for local `uv run`.
+
+2. **Dependencies:**
+   ```sh
+   mise install
+   cd backend && uv sync && cd ..
    ```
 
-3. **iOS xcconfig** — copy the example file and fill in your values:
+3. **iOS xcconfig** — copy the example and fill in your values (the real files are gitignored):
    ```sh
    cp ios/StarterApp/Config.example.xcconfig ios/StarterApp/Config-Debug.xcconfig
    cp ios/StarterApp/Config.example.xcconfig ios/StarterApp/Config-Release.xcconfig
    ```
-   Then edit both files and set:
-   - `DEVELOPMENT_TEAM` — your 10-character Apple Team ID (find it at developer.apple.com → Account → Membership)
-   - `PRODUCT_BUNDLE_IDENTIFIER` — e.g. `com.yourcompany.yourapp`
-   - `SUPABASE_ANON_KEY` — paste the anon key from `supabase status`
-   - `SUPABASE_URL` / `BACKEND_URL` — for a **physical device**, use your tunnel HTTPS URLs (instatunnel, ngrok, or Cloudflare — see [Tunnel alternatives](#tunnel-alternatives-ngrok-and-cloudflare-tunnel)); for the **Simulator**, use `http://127.0.0.1:54321` and `http://127.0.0.1:8000`
+   Then set in `Config-Debug.xcconfig`:
+   - `PRODUCT_BUNDLE_IDENTIFIER` — a reverse-DNS id **unique to your Apple team** (the
+     `com.yourcompany.yourapp` placeholder and `com.example.*` cannot register for a device build).
+   - `DEVELOPMENT_TEAM` — your 10-char Team ID (developer.apple.com → Account → Membership).
+     Optional for `make ios-device`, which auto-detects it from your keychain cert; required to
+     build to a device from the Xcode GUI.
+   - `BACKEND_URL` — leave as `http://localhost:8000` for the Simulator. For a physical device you
+     don't edit this by hand: `make ios-device` rewrites it with the live ngrok URL.
 
-4. **Generate the Xcode project** — the `.xcodeproj` is not committed; Tuist generates it from `Project.swift`:
+4. **Generate the Xcode project** — the `.xcodeproj`/`.xcworkspace` are generated by Tuist, not committed:
    ```sh
-   cd ios/StarterApp
-   tuist install   # fetches SPM dependencies, creates Tuist/Package.resolved
-   tuist generate  # generates StarterApp.xcodeproj
+   make ios-gen        # = cd ios/StarterApp && tuist install && tuist generate
    ```
-   Re-run `tuist generate` any time `Project.swift` changes. Re-run `tuist install && tuist generate` when `Tuist/Package.swift` changes (new dependencies).
-
-5. **Tunnel subdomains** — the two subdomain names live at the top of `run.sh`. Edit them once to match your chosen `instatunnel` subdomains:
-   ```sh
-   SUPA_SUBDOMAIN="my-supa-api"
-   BACKEND_SUBDOMAIN="my-backend-api"
-   ```
-
-6. **Auth deep links** — `supabase/config.toml` must list your app URL scheme in `additional_redirect_urls` (default: `com.example.starter://`). Keep it in sync with `APIConfig.authRedirectScheme` and `CFBundleURLSchemes` in `Project.swift`.
+   Re-run after changing `Project.swift`; re-run `tuist install` too when `Tuist/Package.swift` changes.
 
 ---
 
-## Running with scripts (easiest)
-
-From the repo root:
+## Running on the Simulator (easiest)
 
 ```sh
-./run.sh          # start everything using the existing backend image
-./build-run.sh    # rebuild the backend Docker image first, then start everything
+make dev
 ```
 
-Both scripts:
-- Run `supabase start` first (synchronous — exits once all Supabase containers are healthy)
-- Then background the backend and both tunnels
-- Print the live tunnel URLs once everything is up
-- **Ctrl+C stops all services cleanly**
+`scripts/dev.sh` brings up Postgres + FastAPI + Adminer via Docker Compose, runs Alembic migrations,
+points the iOS `Config-Debug.xcconfig` at local URLs, runs `tuist generate`, then builds and launches
+the app in the iOS Simulator. **Ctrl+C stops everything.**
+
+Useful flags: `make dev ARGS="--regen"` (tuist install + generate), `ARGS="--no-ios"` (services only),
+`ARGS="--sim-logs"` (stream Simulator logs).
 
 ---
 
-## Running manually (4 terminal tabs)
+## Running on a physical iPhone
 
-Use this if you want separate log streams or need to restart one service independently.
+One command handles the tunnel, signing, install, and launch:
 
-### Tab 1 — Supabase
 ```sh
-supabase start
-# Exits automatically once all containers are healthy.
-# To stop later: supabase stop
+make ios-device
+# or, with options:
+./scripts/ios-device.sh --verify-launch 5 --logs
 ```
 
-### Tab 2 — Backend
-```sh
-cd backend
-docker compose up             # use existing image
-# or to rebuild first:
-docker compose up --build
-```
+What it does: start (or reuse) an **ngrok** tunnel to the backend → write that HTTPS URL into
+`BACKEND_URL` in `Config-Debug.xcconfig` → `xcodebuild -destination generic/platform=iOS` with
+automatic signing → `xcrun devicectl device install app` → `... process launch`.
 
-### Tab 3 — Supabase tunnel (port 54321)
-```sh
-instatunnel 54321 --subdomain my-supa-api
-```
+Notes:
+- **Backend must be running first** (`make dev` or `docker compose up -d`). The script checks
+  `http://localhost:8000/healthz` before tunneling.
+- **ngrok, not cloudflared.** Some ISP resolvers return NXDOMAIN for `*.trycloudflare.com`, so
+  cloudflare quick tunnels can fail on both the Mac and the phone. ngrok's domains resolve normally.
+  On the free tier the URL changes each session; reserve a domain and pass
+  `--domain <name>.ngrok-free.dev` (or set `NGROK_DOMAIN`) for a stable URL.
+- **Signing:** team auto-detected from your `Apple Development` keychain cert; override with
+  `--team <ID>` / `IOS_DEVELOPMENT_TEAM`. Dev builds use `StarterApp.dev.entitlements` (Sign In
+  with Apple kept, Apple Pay dropped — it needs a merchant ID); `--full-entitlements` uses the real one.
+- **Use USB.** Over Wi-Fi, build + install are reliable but `devicectl` *launch* and `--logs`
+  (`idevicesyslog`) are flaky/unavailable. A cable makes both reliable.
+- Stop the tunnel later with `./scripts/ios-device.sh --stop-tunnel`.
 
-### Tab 4 — Backend tunnel (port 8000)
-```sh
-instatunnel 8000 --subdomain my-backend-api
-```
-
-Then build and run the iOS target on your device in Xcode (**Debug** configuration).
+Other flags: `--no-tunnel` (BACKEND_URL already reachable), `--device-id <udid>`, `--regen`.
 
 ---
 
 ## Ports at a glance
 
-| Service          | Local port | Tunnel URL (example)                        |
-|------------------|------------|---------------------------------------------|
-| Supabase API     | 54321      | https://my-supa-api.instatunnel.dev         |
-| Supabase Studio  | 54323      | http://127.0.0.1:54323 (local only)         |
-| FastAPI backend  | 8000       | https://my-backend-api.instatunnel.dev      |
+| Service         | Local port | URL                                  |
+|-----------------|------------|--------------------------------------|
+| FastAPI backend | 8000       | http://localhost:8000 (docs `/docs`) |
+| Adminer (DB UI) | 8080       | http://127.0.0.1:8080 (local only)   |
+| PostgreSQL      | 5432       | localhost:5432 (local only)          |
 
 ---
 
@@ -165,21 +130,19 @@ flowchart TD
         iOS["iOS App"]
     end
 
-    subgraph tunnels["instatunnel (HTTPS)"]
-        ST["my-supa-api.instatunnel.dev\n:443"]
-        BT["my-backend-api.instatunnel.dev\n:443"]
+    subgraph tunnel["ngrok (HTTPS)"]
+        NG["your-app.ngrok-free.dev\n:443"]
     end
 
-    subgraph host["Mac (localhost)"]
-        SB["Supabase\n:54321"]
-        BE["FastAPI (Docker)\n:8000"]
+    subgraph host["Mac (localhost, Docker Compose)"]
+        BE["FastAPI\n:8000"]
+        DB["PostgreSQL\n:5432"]
     end
 
-    iOS -->|"SUPABASE_URL"| ST
-    iOS -->|"BACKEND_URL"| BT
-    ST --> SB
-    BT --> BE
-    BE -->|"host.docker.internal:54321\n(no tunnel needed)"| SB
+    iOS -->|"BACKEND_URL"| NG
+    NG --> BE
+    BE --> DB
 ```
 
-The iOS app only ever talks to the two tunnel URLs. The backend skips the tunnel entirely and reaches Supabase via `host.docker.internal`, which Docker Desktop for Mac resolves to the host machine automatically.
+The Simulator skips the tunnel entirely and hits `http://localhost:8000`. Only a physical device
+needs ngrok, because it can't reach the Mac's `localhost`.
