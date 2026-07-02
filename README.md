@@ -4,9 +4,9 @@
 
 **Production-ready template for shipping authenticated iOS apps with a FastAPI backend and self-hosted PostgreSQL — without the weeks of boilerplate.**
 
-[Backend CI](https://github.com/DFly7/iOS-FastAPI-Supabase-AI/actions/workflows/backend-ci.yml)
-[Integration Tests](https://github.com/DFly7/iOS-FastAPI-Supabase-AI/actions/workflows/backend-integration.yml)
-[iOS CI](https://github.com/DFly7/iOS-FastAPI-Supabase-AI/actions/workflows/ios-ci.yml)
+[Backend CI](https://github.com/DFly7/ios-fastapi-selfhosted/actions/workflows/backend-ci.yml)
+[Integration Tests](https://github.com/DFly7/ios-fastapi-selfhosted/actions/workflows/backend-integration.yml)
+[iOS CI](https://github.com/DFly7/ios-fastapi-selfhosted/actions/workflows/ios-ci.yml)
 
 Python
 FastAPI
@@ -41,7 +41,7 @@ Spinning up an authenticated iOS app with a custom backend and a real database t
 iPhone (or Simulator)
         │ BACKEND_URL (tunnel or localhost)
         ▼
-┌─ Optional tunnel (cloudflared / ngrok) ─┐
+┌─ Optional tunnel (ngrok) ───────────────┐
 │  HTTPS → localhost:8000 (FastAPI)      │
 └─────────────────────────────────────────┘
         │
@@ -92,7 +92,6 @@ iPhone (or Simulator)
 
 - **`profiles` table** — auto-created via Alembic migration for every user (app logic triggers on signup)
 - **Alembic versioning** — all schema changes tracked in `backend/alembic/versions/`; migrations run on `make dev`
-- **Seed file** — `backend/seed_db.sql` runs on Postgres startup (set via `docker-compose.yml`)
 - **Adminer browser UI** — full database admin at `http://localhost:8080` (login: server=db, user=postgres, pass=postgres)
 
 ### Testing
@@ -143,7 +142,7 @@ In iOS: set `BACKEND_URL = http://localhost:8000` in `Config-Debug.xcconfig`.
 
 ## Getting started
 
-> Full step-by-step instructions, tunnel options (cloudflared / ngrok), and environment variable reference are in **[local-setup.md](local-setup.md)**.
+> Full step-by-step instructions, tunnel options (ngrok), and environment variable reference are in **[local-setup.md](local-setup.md)**.
 
 ### 0. Rename the project (first-time template users only)
 
@@ -388,7 +387,7 @@ This triggers the **Distribute to TestFlight** GitHub Action. The build appears 
 ## Customising
 
 - **Rename the app** — use `./scripts/rename-project.sh` (see [Rename the project](#0-rename-the-project-first-time-template-users-only) above)
-- **Add a migration** — create a file in `backend/alembic/versions/` following the timestamp naming convention (e.g. `20240101120000_add_new_table.py`); it runs automatically on `make dev` and in CI via `make db-migrate`
+- **Add a migration** — create a file in `backend/alembic/versions/` following the sequential naming convention (e.g. `003_add_new_table.py`); it runs automatically on `make dev` and in CI via `make db-migrate`
 - **Add a backend route** — add a handler in `backend/app/api/v1/`, register it in `router.py`
 - **Add a Swift dependency** — add it to `Tuist/Package.swift`, run `cd ios/StarterApp && tuist install`, then `make ios-gen` from the repo root
 - **Configure Sentry / Resend** — uncomment the relevant lines in `backend/.env` and fill in your keys
@@ -397,7 +396,7 @@ This triggers the **Distribute to TestFlight** GitHub Action. The build appears 
 
 ## Waitlist page (optional)
 
-The `docs/` folder contains a ready-to-ship GitHub Pages waitlist page. However, it requires a backend endpoint to capture signups. You can wire the page to your FastAPI backend or use a third-party service like Supabase, Firebase, or Airtable.
+The `docs/` folder contains a ready-to-ship GitHub Pages waitlist page. However, it requires a backend endpoint to capture signups. You can wire the page to your FastAPI backend or use a third-party service like Airtable.
 
 To enable GitHub Pages, go to **Settings → Pages → Source: Deploy from a branch → Branch: `main` / folder: `docs`**. Your page will be live at `https://<your-username>.github.io/<repo-name>/` within a minute.
 
