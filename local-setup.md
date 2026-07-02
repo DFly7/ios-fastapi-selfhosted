@@ -111,6 +111,28 @@ Notes:
 
 Other flags: `--no-tunnel` (BACKEND_URL already reachable), `--device-id <udid>`, `--regen`, `--console`.
 
+## E2E UI tests (local only)
+
+Requires the dev stack running:
+
+```bash
+make dev          # terminal 1
+make e2e-test     # terminal 2
+```
+
+`make e2e-test` checks `/healthz`, ensures `e2e@example.com` exists via API, boots a clean Simulator, and runs one XCUITest happy path (sign in → secure-test → create note). Not part of `make validate`.
+
+## E2E UI tests (local only)
+
+Requires the dev stack running:
+
+```bash
+make dev          # terminal 1
+make e2e-test     # terminal 2
+```
+
+`make e2e-test` checks `/healthz`, ensures `e2e@example.com` exists via API, boots a clean Simulator, and runs one XCUITest happy path (sign in → secure-test → create note). Not part of `make validate`.
+
 ---
 
 ## Ports at a glance

@@ -58,6 +58,7 @@ Useful targets:
 - `make help` — list all Makefile targets with descriptions.
 - `make backend-test` — backend unit tests (CI-like).
 - `make ios-test` — iOS unit tests (`StarterAppTests`).
+- `make e2e-test` — local E2E UI test against running dev stack (`make dev` first). Not in CI or `validate`.
 - `make lint` — backend Ruff/mypy + SwiftLint.
 
 See `Makefile` for UI tests, Tuist generation, and local dev scripts.
