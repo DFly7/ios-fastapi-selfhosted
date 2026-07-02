@@ -1,7 +1,7 @@
 # Run from the repo root: make <target>
 # Pass extra flags directly:  make dev ARGS="--regen --sim-logs"
 
-.PHONY: dev dev-logs stop check-config sync-models check-models ios-gen ios-run ios-device ios-build ios-test ios-test-ui lint backend-test backend-integration-test db-migrate validate validate-full smoke-test bootstrap check-deps help
+.PHONY: dev dev-logs stop check-config sync-models check-models ios-gen ios-run ios-device ios-build ios-test ios-test-ui e2e-test lint backend-test backend-integration-test db-migrate validate validate-full smoke-test bootstrap check-deps help
 
 # Auto-detect latest available iPhone simulator; override with UDID: make ios-test SIM_ID=<udid>
 SIM_ID ?= $(shell xcrun simctl list devices available | grep -i iphone | tail -1 | grep -oEi '[0-9A-F-]{36}')
@@ -59,6 +59,9 @@ ios-test-ui: ## Run UI tests on Simulator  (override: SIM_ID=<udid>)
 		-only-testing:StarterAppUITests \
 		-destination 'platform=iOS Simulator,id=$(SIM_ID)' \
 		2>&1 | bundle exec xcpretty --color
+
+e2e-test: ## Local E2E: UI test against running dev stack (requires make dev)
+	@bash scripts/e2e-test.sh
 
 # ── Distribution ─────────────────────────────────────────────────────────────
 
