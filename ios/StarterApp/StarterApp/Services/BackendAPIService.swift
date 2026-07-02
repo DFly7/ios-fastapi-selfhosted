@@ -11,7 +11,9 @@ struct SecureTestResponseBody: Decodable, Equatable {
     }
 }
 
-/// Calls the FastAPI backend using the Supabase JWT (`Authorization: Bearer …`).
+/// Calls the FastAPI backend using a JWT (`Authorization: Bearer …`).
+/// All public methods accept an `AuthTokenProviding` rather than a raw token so the
+/// service can automatically refresh an expired token on HTTP 401 and retry once.
 enum BackendAPIService {
     typealias SecureTestResponse = SecureTestResponseBody
 
@@ -30,29 +32,20 @@ enum BackendAPIService {
         return jsonEncoder
     }()
 
-    // MARK: - Core request helper
+    // MARK: - Core request helpers
 
-    /// Executes an authorized HTTP request and returns the raw response `Data`.
-    ///
-    /// - Parameters:
-    ///   - method: HTTP method string ("GET", "POST", "PATCH", "DELETE", …).
-    ///   - path: Path relative to `APIConfig.backendURL` (e.g. `"api/v1/me/profile"`).
-    ///   - bodyData: Already-encoded JSON body, or `nil` for requests without a body.
-    ///   - accessToken: Supabase JWT; throws `AppError.notSignedIn` when absent.
-    /// - Throws: `AppError.notSignedIn`, `AppError.networkFailure`, or `AppError.requestFailed`.
-    private static func request(
+    /// Raw HTTP send. Takes an explicit non-optional token; does NOT perform refresh.
+    /// - Throws: `AppError.networkFailure` on transport error, `AppError.requestFailed` on non-2xx.
+    private static func send(
         method: String,
         path: String,
         bodyData: Data? = nil,
-        accessToken: String?
+        token: String,
+        session: URLSession
     ) async throws -> Data {
-        guard let accessToken, !accessToken.isEmpty else {
-            throw AppError.notSignedIn
-        }
-
         var urlRequest = URLRequest(url: APIConfig.backendURL.appending(path: path))
         urlRequest.httpMethod = method
-        urlRequest.setValue("Bearer \(accessToken)", forHTTPHeaderField: "Authorization")
+        urlRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         if let bodyData {
             urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
             urlRequest.httpBody = bodyData
@@ -60,7 +53,7 @@ enum BackendAPIService {
 
         let (data, response): (Data, URLResponse)
         do {
-            (data, response) = try await URLSession.shared.data(for: urlRequest)
+            (data, response) = try await session.data(for: urlRequest)
         } catch {
             throw AppError.networkFailure(underlying: error)
         }
@@ -74,6 +67,27 @@ enum BackendAPIService {
         return data
     }
 
+    /// Authorized request with automatic single-retry on HTTP 401.
+    ///
+    /// Flow: send with current token → on 401, call `auth.refreshAccessToken()` → send once more
+    /// with the new token. If refresh fails (returns nil) the original 401 error is rethrown.
+    private static func request(
+        method: String,
+        path: String,
+        bodyData: Data? = nil,
+        auth: any AuthTokenProviding,
+        session: URLSession
+    ) async throws -> Data {
+        guard let token = auth.accessToken, !token.isEmpty else { throw AppError.notSignedIn }
+        do {
+            return try await send(method: method, path: path, bodyData: bodyData, token: token, session: session)
+        } catch let original as AppError {
+            guard case .requestFailed(401, _) = original else { throw original }   // only refresh on 401
+            guard let newToken = await auth.refreshAccessToken() else { throw original }  // refresh failed → rethrow
+            return try await send(method: method, path: path, bodyData: bodyData, token: newToken, session: session)  // retry once
+        }
+    }
+
     /// Decodes `data` into `T`, wrapping any `DecodingError` as `AppError.decodingFailure`.
     private static func decode<T: Decodable>(_ type: T.Type, from data: Data) throws -> T {
         do {
@@ -85,19 +99,20 @@ enum BackendAPIService {
 
     // MARK: - Auth / demo
 
-    static func fetchSecureTest(accessToken: String?) async throws -> SecureTestResponse {
+    static func fetchSecureTest(auth: any AuthTokenProviding, session: URLSession = .shared) async throws -> SecureTestResponse {
         let data = try await request(
             method: "GET",
             path: "api/v1/secure-test",
-            accessToken: accessToken
+            auth: auth,
+            session: session
         )
         return try decode(SecureTestResponse.self, from: data)
     }
 
     // MARK: - Profile
 
-    static func fetchMyProfile(accessToken: String?) async throws -> ProfileOut {
-        let data = try await request(method: "GET", path: "api/v1/me/profile", accessToken: accessToken)
+    static func fetchMyProfile(auth: any AuthTokenProviding, session: URLSession = .shared) async throws -> ProfileOut {
+        let data = try await request(method: "GET", path: "api/v1/me/profile", auth: auth, session: session)
         return try decode(ProfileOut.self, from: data)
     }
 
@@ -105,7 +120,8 @@ enum BackendAPIService {
     static func updateMyProfile(
         displayName: String? = nil,
         avatarUrl: String? = nil,
-        accessToken: String?
+        auth: any AuthTokenProviding,
+        session: URLSession = .shared
     ) async throws -> ProfileOut {
         let payload = ProfileUpdate(displayName: displayName, avatarUrl: avatarUrl)
         let body = try encoder.encode(payload)
@@ -113,27 +129,29 @@ enum BackendAPIService {
             method: "PATCH",
             path: "api/v1/me/profile",
             bodyData: body,
-            accessToken: accessToken
+            auth: auth,
+            session: session
         )
         return try decode(ProfileOut.self, from: data)
     }
 
     // MARK: - Notes
 
-    static func fetchNotes(accessToken: String?) async throws -> [NoteOut] {
-        let data = try await request(method: "GET", path: "api/v1/me/notes", accessToken: accessToken)
+    static func fetchNotes(auth: any AuthTokenProviding, session: URLSession = .shared) async throws -> [NoteOut] {
+        let data = try await request(method: "GET", path: "api/v1/me/notes", auth: auth, session: session)
         return try decode([NoteOut].self, from: data)
     }
 
     /// POST /api/v1/me/notes — returns the created note with its server-assigned id and timestamps.
-    static func createNote(title: String, body: String? = nil, accessToken: String?) async throws -> NoteOut {
+    static func createNote(title: String, body: String? = nil, auth: any AuthTokenProviding, session: URLSession = .shared) async throws -> NoteOut {
         let payload = NoteIn(title: title, body: body)
         let bodyData = try encoder.encode(payload)
         let data = try await request(
             method: "POST",
             path: "api/v1/me/notes",
             bodyData: bodyData,
-            accessToken: accessToken
+            auth: auth,
+            session: session
         )
         return try decode(NoteOut.self, from: data)
     }
@@ -143,7 +161,8 @@ enum BackendAPIService {
         id: UUID,
         title: String? = nil,
         body: String? = nil,
-        accessToken: String?
+        auth: any AuthTokenProviding,
+        session: URLSession = .shared
     ) async throws -> NoteOut {
         let payload = NoteUpdate(title: title, body: body)
         let bodyData = try encoder.encode(payload)
@@ -151,17 +170,19 @@ enum BackendAPIService {
             method: "PATCH",
             path: "api/v1/me/notes/\(id.uuidString.lowercased())",
             bodyData: bodyData,
-            accessToken: accessToken
+            auth: auth,
+            session: session
         )
         return try decode(NoteOut.self, from: data)
     }
 
     /// DELETE /api/v1/me/notes/{id} — server returns 204 No Content on success.
-    static func deleteNote(id: UUID, accessToken: String?) async throws {
+    static func deleteNote(id: UUID, auth: any AuthTokenProviding, session: URLSession = .shared) async throws {
         _ = try await request(
             method: "DELETE",
             path: "api/v1/me/notes/\(id.uuidString.lowercased())",
-            accessToken: accessToken
+            auth: auth,
+            session: session
         )
     }
 }

@@ -31,7 +31,7 @@ struct ContentView: View {
                 notesSection
             }
             .navigationTitle("Starter")
-            .task { await viewModel.fetchNotes(accessToken: authService.accessToken) }
+            .task { await viewModel.fetchNotes(auth: authService) }
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
                     Menu {
@@ -140,7 +140,7 @@ struct ContentView: View {
                 .foregroundStyle(.secondary)
 
                 Button {
-                    Task { await viewModel.callSecureTest(accessToken: authService.accessToken) }
+                    Task { await viewModel.callSecureTest(auth: authService) }
                 } label: {
                     if viewModel.isCallingSecureTest {
                         HStack { ProgressView(); Text("Calling /api/v1/secure-test…") }
@@ -161,7 +161,7 @@ struct ContentView: View {
 
                 if let error = viewModel.secureTestError {
                     ErrorBanner(message: error.localizedDescription) {
-                        Task { await viewModel.callSecureTest(accessToken: authService.accessToken) }
+                        Task { await viewModel.callSecureTest(auth: authService) }
                     }
                 }
             }
@@ -193,7 +193,7 @@ struct ContentView: View {
                                     Task {
                                         await viewModel.updateProfile(
                                             displayName: name,
-                                            accessToken: authService.accessToken
+                                            auth: authService
                                         )
                                     }
                                 }
@@ -219,7 +219,7 @@ struct ContentView: View {
                 } else {
                     // GET /me/profile demo — button-triggered fetch
                     Button {
-                        Task { await viewModel.fetchProfile(accessToken: authService.accessToken) }
+                        Task { await viewModel.fetchProfile(auth: authService) }
                     } label: {
                         if viewModel.isLoadingProfile {
                             HStack { ProgressView(); Text("GET /api/v1/me/profile…") }
@@ -232,7 +232,7 @@ struct ContentView: View {
 
                 if let error = viewModel.profileError {
                     ErrorBanner(message: error.localizedDescription) {
-                        Task { await viewModel.fetchProfile(accessToken: authService.accessToken) }
+                        Task { await viewModel.fetchProfile(auth: authService) }
                     }
                 }
             }
@@ -269,7 +269,7 @@ struct ContentView: View {
                                     await viewModel.updateNote(
                                         id: id,
                                         title: title,
-                                        accessToken: authService.accessToken
+                                        auth: authService
                                     )
                                 }
                             }
@@ -300,7 +300,7 @@ struct ContentView: View {
                     }
                     .swipeActions(edge: .trailing, allowsFullSwipe: true) {
                         Button(role: .destructive) {
-                            Task { await viewModel.deleteNote(id: note.id, accessToken: authService.accessToken) }
+                            Task { await viewModel.deleteNote(id: note.id, auth: authService) }
                         } label: {
                             Label("Delete", systemImage: "trash")
                         }
@@ -316,7 +316,7 @@ struct ContentView: View {
                         let title = newNoteTitle
                         newNoteTitle = ""
                         isShowingNoteComposer = false
-                        Task { await viewModel.createNote(title: title, accessToken: authService.accessToken) }
+                        Task { await viewModel.createNote(title: title, auth: authService) }
                     }
                     .disabled(newNoteTitle.trimmingCharacters(in: .whitespaces).isEmpty || viewModel.isCreatingNote)
                     Button("Cancel") { newNoteTitle = ""; isShowingNoteComposer = false }
@@ -337,7 +337,7 @@ struct ContentView: View {
 
             if let error = viewModel.notesError {
                 ErrorBanner(message: error.localizedDescription) {
-                    Task { await viewModel.fetchNotes(accessToken: authService.accessToken) }
+                    Task { await viewModel.fetchNotes(auth: authService) }
                 }
             }
 

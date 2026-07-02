@@ -50,13 +50,13 @@ final class ContentViewModel {
 
     // MARK: - Actions
 
-    func callSecureTest(accessToken: String?) async {
+    func callSecureTest(auth: any AuthTokenProviding) async {
         secureTestError = nil
         secureTestResult = nil
         isCallingSecureTest = true
         defer { isCallingSecureTest = false }
         do {
-            secureTestResult = try await BackendAPIService.fetchSecureTest(accessToken: accessToken)
+            secureTestResult = try await BackendAPIService.fetchSecureTest(auth: auth)
         } catch let appError as AppError {
             secureTestError = appError
         } catch {
@@ -64,12 +64,12 @@ final class ContentViewModel {
         }
     }
 
-    func fetchProfile(accessToken: String?) async {
+    func fetchProfile(auth: any AuthTokenProviding) async {
         profileError = nil
         isLoadingProfile = true
         defer { isLoadingProfile = false }
         do {
-            profile = try await BackendAPIService.fetchMyProfile(accessToken: accessToken)
+            profile = try await BackendAPIService.fetchMyProfile(auth: auth)
         } catch let appError as AppError {
             profileError = appError
         } catch {
@@ -77,14 +77,14 @@ final class ContentViewModel {
         }
     }
 
-    func updateProfile(displayName: String, accessToken: String?) async {
+    func updateProfile(displayName: String, auth: any AuthTokenProviding) async {
         updateProfileError = nil
         isUpdatingProfile = true
         defer { isUpdatingProfile = false }
         do {
             profile = try await BackendAPIService.updateMyProfile(
                 displayName: displayName,
-                accessToken: accessToken
+                auth: auth
             )
         } catch let appError as AppError {
             updateProfileError = appError
@@ -93,12 +93,12 @@ final class ContentViewModel {
         }
     }
 
-    func fetchNotes(accessToken: String?) async {
+    func fetchNotes(auth: any AuthTokenProviding) async {
         notesError = nil
         isLoadingNotes = true
         defer { isLoadingNotes = false }
         do {
-            notes = try await BackendAPIService.fetchNotes(accessToken: accessToken)
+            notes = try await BackendAPIService.fetchNotes(auth: auth)
         } catch let appError as AppError {
             notesError = appError
         } catch {
@@ -106,12 +106,12 @@ final class ContentViewModel {
         }
     }
 
-    func createNote(title: String, body: String? = nil, accessToken: String?) async {
+    func createNote(title: String, body: String? = nil, auth: any AuthTokenProviding) async {
         notesError = nil
         isCreatingNote = true
         defer { isCreatingNote = false }
         do {
-            let note = try await BackendAPIService.createNote(title: title, body: body, accessToken: accessToken)
+            let note = try await BackendAPIService.createNote(title: title, body: body, auth: auth)
             notes.insert(note, at: 0)
         } catch let appError as AppError {
             notesError = appError
@@ -120,12 +120,12 @@ final class ContentViewModel {
         }
     }
 
-    func updateNote(id: UUID, title: String, accessToken: String?) async {
+    func updateNote(id: UUID, title: String, auth: any AuthTokenProviding) async {
         updateNoteError = nil
         isUpdatingNote = true
         defer { isUpdatingNote = false }
         do {
-            let updated = try await BackendAPIService.updateNote(id: id, title: title, accessToken: accessToken)
+            let updated = try await BackendAPIService.updateNote(id: id, title: title, auth: auth)
             if let index = notes.firstIndex(where: { $0.id == id }) {
                 notes[index] = updated
             }
@@ -136,9 +136,9 @@ final class ContentViewModel {
         }
     }
 
-    func deleteNote(id: UUID, accessToken: String?) async {
+    func deleteNote(id: UUID, auth: any AuthTokenProviding) async {
         do {
-            try await BackendAPIService.deleteNote(id: id, accessToken: accessToken)
+            try await BackendAPIService.deleteNote(id: id, auth: auth)
             notes.removeAll { $0.id == id }
         } catch let appError as AppError {
             notesError = appError

@@ -4,6 +4,20 @@ import OSLog
 import PostHog
 import SwiftUI
 
+// MARK: - Auth seam protocol
+
+/// A single-flight token provider. BackendAPIService uses this to refresh expired tokens
+/// without knowing about AuthService internals.
+@MainActor
+protocol AuthTokenProviding: AnyObject {
+    /// The current access token, or nil if the user is not signed in.
+    var accessToken: String? { get }
+    /// Refreshes the access token using the stored refresh token.
+    /// Concurrent calls while a refresh is in flight join the same underlying Task.
+    /// Returns the new token, or nil if refresh failed (session has been cleared).
+    func refreshAccessToken() async -> String?
+}
+
 @Observable
 @MainActor
 final class AuthService {
@@ -17,9 +31,15 @@ final class AuthService {
     private(set) var accessToken: String?
 
     private let backendURL: URL
+    private let session: URLSession
 
-    init(backendURL: URL) {
+    // MARK: - Single-flight refresh state
+
+    private var refreshTask: Task<String?, Never>?
+
+    init(backendURL: URL, session: URLSession = .shared) {
         self.backendURL = backendURL
+        self.session = session
         Task { await restoreSession() }
     }
 
@@ -27,11 +47,11 @@ final class AuthService {
 
     private func restoreSession() async {
         defer { isCheckingInitialSession = false }
-        guard let refresh = KeychainTokenStore.loadRefreshToken() else {
+        guard KeychainTokenStore.loadRefreshToken() != nil else {
             clearSessionState()
             return
         }
-        await performRefresh(refreshToken: refresh)
+        _ = await refreshAccessToken()
     }
 
     // MARK: – Public API
@@ -69,26 +89,45 @@ final class AuthService {
     func signOut() {
         Task {
             if let refresh = KeychainTokenStore.loadRefreshToken() {
-                try? await post(path: "/api/v1/auth/logout", body: ["refresh_token": refresh]) as EmptyResponse
+                _ = try? await post(path: "/api/v1/auth/logout", body: ["refresh_token": refresh]) as EmptyResponse
             }
             withAnimation { clearSessionState() }
         }
     }
 
-    // MARK: – Internal
+    // MARK: – AuthTokenProviding conformance helpers
 
-    private func performRefresh(refreshToken: String) async {
+    func refreshAccessToken() async -> String? {
+        if let existing = refreshTask { return await existing.value }  // join in-flight refresh
+        let task = Task<String?, Never> { [weak self] in
+            await self?.doRefresh() ?? nil
+        }
+        refreshTask = task
+        let result = await task.value
+        refreshTask = nil
+        return result
+    }
+
+    private func doRefresh() async -> String? {
+        guard let refresh = KeychainTokenStore.loadRefreshToken() else {
+            clearSessionState()
+            return nil
+        }
         do {
             let resp: TokenResponse = try await post(
                 path: "/api/v1/auth/refresh",
-                body: ["refresh_token": refreshToken]
+                body: ["refresh_token": refresh]
             )
             applyTokens(resp)
+            return resp.accessToken
         } catch {
             AppLog.auth.error("Token refresh failed: \(error.localizedDescription, privacy: .public)")
             withAnimation { clearSessionState() }
+            return nil
         }
     }
+
+    // MARK: – Internal
 
     private func applyTokens(_ resp: TokenResponse) {
         KeychainTokenStore.save(accessToken: resp.accessToken, refreshToken: resp.refreshToken)
@@ -127,7 +166,7 @@ final class AuthService {
         req.httpMethod = "POST"
         req.setValue("application/json", forHTTPHeaderField: "Content-Type")
         req.httpBody = try JSONEncoder().encode(body)
-        let (data, response) = try await URLSession.shared.data(for: req)
+        let (data, response) = try await session.data(for: req)
         guard let http = response as? HTTPURLResponse else { throw AuthError.network }
         guard (200..<300).contains(http.statusCode) else {
             let msg = (try? JSONDecoder().decode(APIErrorBody.self, from: data))?.message
@@ -195,6 +234,10 @@ final class AuthService {
         isAuthenticated = true; self.userId = userId; userEmail = email
     }
 }
+
+// MARK: – AuthTokenProviding conformance
+
+extension AuthService: AuthTokenProviding {}
 
 // MARK: – Supporting types
 
