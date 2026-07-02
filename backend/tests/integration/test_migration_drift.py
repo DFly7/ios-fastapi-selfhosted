@@ -57,9 +57,7 @@ async def clean_migrated_db():
 
     # 2. Run migrations in a subprocess to keep Alembic's asyncio loop separate
     #    from pytest-asyncio's loop.
-    backend_dir = os.path.realpath(
-        os.path.join(os.path.dirname(__file__), "..", "..")
-    )
+    backend_dir = os.path.realpath(os.path.join(os.path.dirname(__file__), "..", ".."))
     env = {
         **os.environ,
         "DATABASE_URL": TEST_DB_URL,
@@ -73,9 +71,7 @@ async def clean_migrated_db():
         text=True,
     )
     if result.returncode != 0:
-        raise RuntimeError(
-            f"alembic upgrade head failed:\n{result.stdout}\n{result.stderr}"
-        )
+        raise RuntimeError(f"alembic upgrade head failed:\n{result.stdout}\n{result.stderr}")
 
     yield  # test runs here
 
@@ -110,10 +106,7 @@ async def test_migrations_match_metadata(clean_migrated_db):
     # Alembic autogenerate sometimes reports server_default representation
     # differences for Boolean columns (e.g. "true" vs. True) — these are
     # harmless dialect rendering differences and do not indicate real drift.
-    real_diffs = [
-        d for d in diff
-        if not _is_benign_server_default_diff(d)
-    ]
+    real_diffs = [d for d in diff if not _is_benign_server_default_diff(d)]
 
     assert real_diffs == [], (
         f"Migration drift detected — {len(real_diffs)} difference(s) between "

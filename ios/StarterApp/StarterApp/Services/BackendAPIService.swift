@@ -84,7 +84,13 @@ enum BackendAPIService {
         } catch let original as AppError {
             guard case .requestFailed(401, _) = original else { throw original }   // only refresh on 401
             guard let newToken = await auth.refreshAccessToken() else { throw original }  // refresh failed → rethrow
-            return try await send(method: method, path: path, bodyData: bodyData, token: newToken, session: session)  // retry once
+            return try await send(
+                method: method,
+                path: path,
+                bodyData: bodyData,
+                token: newToken,
+                session: session
+            )  // retry once
         }
     }
 
@@ -99,7 +105,10 @@ enum BackendAPIService {
 
     // MARK: - Auth / demo
 
-    static func fetchSecureTest(auth: any AuthTokenProviding, session: URLSession = .shared) async throws -> SecureTestResponse {
+    static func fetchSecureTest(
+        auth: any AuthTokenProviding,
+        session: URLSession = .shared
+    ) async throws -> SecureTestResponse {
         let data = try await request(
             method: "GET",
             path: "api/v1/secure-test",
@@ -143,7 +152,12 @@ enum BackendAPIService {
     }
 
     /// POST /api/v1/me/notes — returns the created note with its server-assigned id and timestamps.
-    static func createNote(title: String, body: String? = nil, auth: any AuthTokenProviding, session: URLSession = .shared) async throws -> NoteOut {
+    static func createNote(
+        title: String,
+        body: String? = nil,
+        auth: any AuthTokenProviding,
+        session: URLSession = .shared
+    ) async throws -> NoteOut {
         let payload = NoteIn(title: title, body: body)
         let bodyData = try encoder.encode(payload)
         let data = try await request(

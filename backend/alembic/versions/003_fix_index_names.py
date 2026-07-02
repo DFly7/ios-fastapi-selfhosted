@@ -14,7 +14,6 @@ This migration reconciles the live schema with ``Base.metadata`` so that the
 drift guard (``test_migration_drift.py``) can pass.
 """
 
-import sqlalchemy as sa
 from alembic import op
 
 revision = "003"
