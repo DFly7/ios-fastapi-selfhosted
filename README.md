@@ -387,7 +387,7 @@ This triggers the **Distribute to TestFlight** GitHub Action. The build appears 
 ## Customising
 
 - **Rename the app** — use `./scripts/rename-project.sh` (see [Rename the project](#0-rename-the-project-first-time-template-users-only) above)
-- **Add a migration** — create a file in `backend/alembic/versions/` following the sequential naming convention (e.g. `003_add_new_table.py`); it runs automatically on `make dev` and in CI via `make db-migrate`
+- **Add a migration** — create a file in `backend/alembic/versions/` following the sequential naming convention (the next free number, e.g. `004_add_new_table.py`); it runs automatically on `make dev` and in CI via `make db-migrate`
 - **Add a backend route** — add a handler in `backend/app/api/v1/`, register it in `router.py`
 - **Add a Swift dependency** — add it to `Tuist/Package.swift`, run `cd ios/StarterApp && tuist install`, then `make ios-gen` from the repo root
 - **Configure Sentry / Resend** — uncomment the relevant lines in `backend/.env` and fill in your keys
