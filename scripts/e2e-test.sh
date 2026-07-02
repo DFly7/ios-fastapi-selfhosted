@@ -16,6 +16,13 @@ E2E_EMAIL="e2e@example.com"
 E2E_PASSWORD="E2ETest123!"
 SIM_ID="${SIM_ID:-}"
 
+# Resolve SIM_ID early if not set (same pattern as Makefile)
+if [[ -z "$SIM_ID" ]]; then
+  SIM_ID=$(xcrun simctl list devices available | grep -i iphone | tail -1 | grep -oEi '[0-9A-F-]{36}')
+fi
+echo "  Using simulator: ${SIM_ID}"
+echo ""
+
 echo "==> E2E UI test (dev stack at ${BASE})"
 echo ""
 
@@ -47,22 +54,7 @@ echo ""
 
 # ── 3. Boot simulator with clean state ──────────────────────────────────────
 echo "── Simulator (clean state) ──"
-./scripts/ios-sim.sh --headless --clean-state
-echo ""
-
-# Resolve SIM_ID if not set (same pattern as Makefile)
-if [[ -z "$SIM_ID" ]]; then
-  SIM_ID=$(xcrun simctl list devices booted -j | python3 -c "
-import sys, json
-for runtime in json.load(sys.stdin).get('devices', {}).values():
-    for d in runtime:
-        if d.get('state') == 'Booted':
-            print(d['udid'])
-            raise SystemExit
-raise SystemExit('No booted simulator after ios-sim.sh')
-")
-fi
-echo "  Using simulator: ${SIM_ID}"
+./scripts/ios-sim.sh --udid "$SIM_ID" --headless --clean-state
 echo ""
 
 # ── 4. Run UI test ──────────────────────────────────────────────────────────
