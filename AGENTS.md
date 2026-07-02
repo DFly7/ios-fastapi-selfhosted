@@ -72,6 +72,25 @@ The agent can build, launch, screenshot, read, and interact with the iOS app fro
 - **Screenshot:** `idb screenshot /tmp/screen.png` — then view the image to verify visually
 - **MCP tools:** The `ios-simulator` MCP server (`.cursor/mcp.json`, `.claude/settings.json`) exposes `ui_describe_all`, `ui_tap`, `ui_type`, `screenshot` as native tool calls
 
+## iOS physical device (`make ios-device`)
+
+`scripts/ios-device.sh` builds, signs, installs, and launches on a **paired iPhone** in one step:
+ngrok tunnel → inject `BACKEND_URL` → `xcodebuild -destination generic/platform=iOS` →
+`xcrun devicectl device install app` → `... process launch`.
+
+- **Command:** `make ios-device` (or `./scripts/ios-device.sh --verify-launch 5 --logs`).
+- **Signing:** automatic. Team ID is auto-detected from the `Apple Development` keychain cert;
+  override with `--team`/`IOS_DEVELOPMENT_TEAM`. **Do not commit a real team ID** — keep it in the
+  gitignored `Config-Debug.xcconfig` or let the script detect it. Bundle id must be unique to the
+  team (set `PRODUCT_BUNDLE_IDENTIFIER` in `Config-Debug.xcconfig`; the `com.example.*` placeholder
+  won't register).
+- **Tunnel:** ngrok, not `cloudflared` (some ISP resolvers NXDOMAIN `*.trycloudflare.com`). Needs an
+  authtoken; use `--domain` for a stable reserved URL.
+- **Entitlements:** dev builds use `StarterApp.dev.entitlements` (Sign In with Apple kept, Apple Pay
+  dropped); `--full-entitlements` uses the real one for parity with Release.
+- **USB recommended:** over Wi-Fi, `devicectl` *launch* and `idevicesyslog` (`--logs`) are flaky;
+  build/install still work. Flags: `--no-tunnel`, `--device-id`, `--regen`, `--stop-tunnel`.
+
 ## Agent-only docs (not GitHub Pages)
 
 The **`docs/`** tree is for the **published site** (e.g. GitHub Pages). Do not put internal design specs or implementation plans there.

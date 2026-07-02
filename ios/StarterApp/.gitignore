@@ -37,6 +37,7 @@ StarterApp.xcodeproj/
 StarterApp.xcworkspace/
 Derived/
 DerivedDataRun/
+DerivedDataDevice/
 
 # Tuist build cache and SPM dependency build artifacts (keep Tuist/Package.resolved committed)
 .tuist-build/

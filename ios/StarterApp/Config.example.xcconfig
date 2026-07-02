@@ -4,11 +4,18 @@
 // Use https:/$()/ so // inside URLs is not treated as an xcconfig comment.
 
 // --- Identity (required to build on a device or submit to App Store) ---
-// Find your 10-character Team ID at developer.apple.com -> Account -> Membership
+// Find your 10-character Team ID at developer.apple.com -> Account -> Membership.
+// `make ios-device` auto-detects the team from your keychain, so DEVELOPMENT_TEAM
+// here is mainly for building to a device from the Xcode GUI. Never commit a real one.
 DEVELOPMENT_TEAM = XXXXXXXXXX
+// Must be UNIQUE to your team — the com.example.* / com.yourcompany.* placeholders
+// cannot register for a device build. Use a reverse-DNS id you own, e.g. ai.yourco.appname.
 PRODUCT_BUNDLE_IDENTIFIER = com.yourcompany.yourapp
 
 // --- Runtime secrets ---
+// Simulator: http://localhost:8000 works. Physical device: needs an HTTPS tunnel URL
+// (a phone can't reach localhost). `make ios-device` starts ngrok and rewrites this
+// line automatically — you don't have to edit it by hand for device runs.
 BACKEND_URL = http://localhost:8000
 
 // --- PostHog (optional) ---

@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<!--
+  Dev-only entitlements for physical-device builds via scripts/ios-device.sh.
+  Keeps Sign In with Apple (Xcode auto-registers this capability with
+  -allowProvisioningUpdates) but DROPS Apple Pay (com.apple.developer.in-app-payments),
+  which needs a merchant ID configured manually in the Apple Developer portal.
+  The real StarterApp.entitlements (with Apple Pay) is used for Release / TestFlight.
+-->
+<dict>
+	<key>com.apple.developer.applesignin</key>
+	<array>
+		<string>Default</string>
+	</array>
+</dict>
+</plist>

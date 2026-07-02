@@ -88,6 +88,35 @@ idb ui swipe <x1> <y1> <x2> <y2> --udid <UDID>
 
 **MCP tools (ios-simulator):** `ui_describe_all`, `ui_tap`, `ui_type`, `screenshot` — available as native tool calls when the MCP server is running.
 
+## iOS physical device (`make ios-device`)
+
+Build, sign, install, and launch on a paired iPhone in one command:
+
+```bash
+make ios-device            # auto team, auto tunnel, first paired iPhone
+./scripts/ios-device.sh --verify-launch 5 --logs
+```
+
+The script (`scripts/ios-device.sh`) chains: start/reuse an **ngrok** tunnel → inject its
+URL into `BACKEND_URL` → `xcodebuild -destination generic/platform=iOS` → `devicectl install` →
+`devicectl launch`. Key points:
+
+- **Team ID** is auto-detected from your `Apple Development` keychain cert. Override with
+  `--team <ID>` or `IOS_DEVELOPMENT_TEAM`. **Never commit a real team ID** — the template ships
+  the `XXXXXXXXXX` placeholder in `Config.example.xcconfig`; your real one lives only in the
+  gitignored `Config-Debug.xcconfig` (or is auto-detected).
+- **Bundle id** must be unique to your team (the `com.example.*` placeholder will not register).
+  Set `PRODUCT_BUNDLE_IDENTIFIER` in your gitignored `Config-Debug.xcconfig`.
+- **Tunnel:** a phone can't reach `localhost`. We use ngrok (not `cloudflared` — some ISP
+  resolvers NXDOMAIN `*.trycloudflare.com`). Needs `ngrok config add-authtoken <token>`.
+  For a stable URL, reserve a domain and pass `--domain <name>.ngrok-free.dev`.
+- **Entitlements:** device dev builds use `StarterApp.dev.entitlements` (Sign In with Apple kept,
+  Apple Pay dropped — it needs a merchant ID). `--full-entitlements` uses the real one.
+- **USB strongly recommended.** Over Wi-Fi, build/install are reliable but `devicectl` *launch*
+  and `idevicesyslog` logs are flaky/unavailable. Connect a cable for reliable launch + `--logs`.
+
+Useful flags: `--no-tunnel`, `--domain`, `--device-id`, `--regen`, `--stop-tunnel`, `--logs`.
+
 ## Skills
 
 Detailed playbooks: `.agents/skills/<name>/SKILL.md`. Read the relevant skill before implementing when a task matches.

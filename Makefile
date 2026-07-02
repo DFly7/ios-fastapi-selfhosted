@@ -1,7 +1,7 @@
 # Run from the repo root: make <target>
 # Pass extra flags directly:  make dev ARGS="--regen --sim-logs"
 
-.PHONY: dev dev-logs stop check-config sync-models check-models ios-gen ios-run ios-build ios-test ios-test-ui lint backend-test backend-integration-test validate validate-full smoke-test bootstrap check-deps help
+.PHONY: dev dev-logs stop check-config sync-models check-models ios-gen ios-run ios-device ios-build ios-test ios-test-ui lint backend-test backend-integration-test validate validate-full smoke-test bootstrap check-deps help
 
 # Auto-detect latest available iPhone simulator; override with UDID: make ios-test SIM_ID=<udid>
 SIM_ID ?= $(shell xcrun simctl list devices available | grep -i iphone | tail -1 | grep -oEi '[0-9A-F-]{36}')
@@ -30,6 +30,9 @@ ios-run: ## Run ios-gen, then build and launch StarterApp on Simulator (override
 	@[ -n "$(SIM_ID)" ] || (echo "No iPhone simulator found — install one via Xcode ▸ Settings ▸ Platforms"; exit 1)
 	$(MAKE) ios-gen
 	./scripts/ios-sim.sh --udid $(SIM_ID)
+
+ios-device: ## Build, install & launch StarterApp on a paired physical iPhone (override: TEAM=<id> DEVICE_ID=<udid>)
+	./scripts/ios-device.sh $(if $(TEAM),--team $(TEAM)) $(if $(DEVICE_ID),--device-id $(DEVICE_ID)) $(ARGS)
 
 ios-build: ## Build the iOS app for Simulator without running tests (faster CI gate)
 	@[ -n "$(SIM_ID)" ] || (echo "No iPhone simulator found — install one via Xcode ▸ Settings ▸ Platforms"; exit 1)

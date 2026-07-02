@@ -217,7 +217,7 @@ Services:
   Adminer DB   → http://127.0.0.1:8080
 ```
 
-For a physical device you still need HTTPS tunnel URLs in xcconfig; see **[local-setup.md](local-setup.md)**. Extra flags: `make dev ARGS="--regen"` (tuist install + generate), `ARGS="--no-ios"` (services only), `ARGS="--sim-logs"`.
+For a **physical iPhone**, use `make ios-device` (one command: ngrok tunnel → inject `BACKEND_URL` → build → sign → install → launch). It auto-detects your signing team from the keychain; set a unique `PRODUCT_BUNDLE_IDENTIFIER` in your gitignored `Config-Debug.xcconfig` first, and run `ngrok config add-authtoken <token>` once. USB is recommended (over Wi-Fi, launch/log streaming is flaky). Extra `make dev` flags: `ARGS="--regen"` (tuist install + generate), `ARGS="--no-ios"` (services only), `ARGS="--sim-logs"`.
 
 ### 4. Open the iOS project in Xcode (optional)
 
@@ -230,7 +230,7 @@ open ios/StarterApp/StarterApp.xcworkspace
 
 Tuist writes `StarterApp.xcodeproj` and `StarterApp.xcworkspace` under `ios/StarterApp/`; both are generated and gitignored. **Open the `.xcworkspace`** (same as CI and `make ios-test`). Opening only an old or copied `.xcodeproj` can show stale targets and package resolution. If you change Swift package dependencies, run `cd ios/StarterApp && tuist install` before `make ios-gen` (see **Customising**).
 
-Build and run on the Simulator or a physical device (device builds need valid signing and tunnel URLs — see **local-setup.md**).
+Build and run on the Simulator (`make ios-run`) or a **physical device** (`make ios-device` — handles signing + tunnel automatically; see the [CLAUDE.md](CLAUDE.md) "iOS physical device" section).
 
 ---
 
