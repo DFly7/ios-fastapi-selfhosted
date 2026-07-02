@@ -7,6 +7,10 @@ import Testing
 /// A URLProtocol that dequeues pre-configured (statusCode, body) responses.
 /// Thread-safe via NSLock. Use with a URLSession backed by URLSessionConfiguration.ephemeral.
 ///
+/// `URLProtocol` subclasses are NSObject-based and not `Sendable` by default. All mutable
+/// static state is guarded by `lock`, so `@unchecked Sendable` satisfies concurrency checks
+/// when the stub is referenced from async test contexts.
+///
 /// Call `StubURLProtocol.reset()` before each test that uses it.
 final class StubURLProtocol: URLProtocol, @unchecked Sendable {
     struct StubResponse {
@@ -149,10 +153,11 @@ struct AuthServiceSingleFlightTests {
             session: stubSession
         )
 
-        // Allow AuthService.init's `Task { await restoreSession() }` to complete.
-        // restoreSession() will call refreshAccessToken() → doRefresh() → one HTTP hit.
-        // We then reset the counter before our 5-concurrent test.
-        try await Task.sleep(nanoseconds: 100_000_000)  // 100 ms
+        // Wait for AuthService.init's background restoreSession() to finish.
+        // restoreSession() sets isCheckingInitialSession = false in defer.
+        while authService.isCheckingInitialSession {
+            await Task.yield()
+        }
 
         // The init's restoreSession consumed one response; reset for the actual test.
         StubURLProtocol.reset()
