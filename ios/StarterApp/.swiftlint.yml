@@ -7,6 +7,7 @@ excluded:
   # Local/Xcode build products (not present on GitHub runners; avoids linting DerivedSources).
   - DerivedDataRun
   - DerivedData
+  - DerivedDataDevice
   # Tuist project manifests use ProjectDescription, not app code style.
   - Project.swift
   - Tuist.swift

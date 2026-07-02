@@ -34,7 +34,8 @@
 #   ./scripts/ios-device.sh --device-id <UDID>      # target a specific device
 #   ./scripts/ios-device.sh --regen                 # tuist install + generate first
 #   ./scripts/ios-device.sh --verify-launch 5       # fail if app dies within 5s
-#   ./scripts/ios-device.sh --logs                  # stream device console logs (needs USB + libimobiledevice)
+#   ./scripts/ios-device.sh --console               # launch attached & stream os_log over Wi-Fi (DEBUG mirrors AppLog to stdout)
+#   ./scripts/ios-device.sh --logs                  # stream full device syslog (needs USB + libimobiledevice)
 #   ./scripts/ios-device.sh --allow-device-registration  # let Xcode register a new device
 #   ./scripts/ios-device.sh --no-tunnel             # skip tunnel (BACKEND_URL is already reachable)
 #   ./scripts/ios-device.sh --tunnel                # force tunnel even if BACKEND_URL isn't loopback
@@ -50,6 +51,7 @@ set -euo pipefail
 REGEN=false
 VERIFY_LAUNCH=0
 LOGS=false
+CONSOLE=false
 DEVICE_ID="${IOS_DEVICE_ID:-}"
 TEAM="${IOS_DEVELOPMENT_TEAM:-}"
 ALLOW_DEVICE_REGISTRATION=false
@@ -69,6 +71,7 @@ while [[ $# -gt 0 ]]; do
     --team)                      TEAM="$2";                     shift 2 ;;
     --verify-launch)             VERIFY_LAUNCH="${2:-5}";       shift 2 ;;
     --logs)                      LOGS=true;                     shift ;;
+    --console)                   CONSOLE=true;                  shift ;;
     --allow-device-registration) ALLOW_DEVICE_REGISTRATION=true; shift ;;
     --tunnel)                    TUNNEL=true;                   shift ;;
     --no-tunnel)                 TUNNEL=false;                  shift ;;
@@ -83,6 +86,12 @@ while [[ $# -gt 0 ]]; do
     *) echo "Unknown argument: $1  (try --help)"; exit 1 ;;
   esac
 done
+
+if $CONSOLE && $LOGS; then
+  echo "Error: --console and --logs are mutually exclusive."
+  echo "       --console streams AppLog over Wi-Fi (devicectl attach); --logs needs USB + libimobiledevice."
+  exit 1
+fi
 
 # ---------------------------------------------------------------------------
 # Tunnel state — ngrok runs one background agent with a local API on :4040.
@@ -342,6 +351,16 @@ EXEC_NAME=$(defaults read "$(pwd)/$APP_PATH/Info.plist" CFBundleExecutable 2>/de
 # ---------------------------------------------------------------------------
 echo "→ Installing ${BUNDLE_ID} on ${DEVICE_NAME}…"
 xcrun devicectl device install app --device "$DEVICE_ID" "$APP_PATH"
+
+if $CONSOLE; then
+  echo "→ Launching attached (--console) — streaming os_log over the tunnel. Ctrl-C to stop."
+  echo "  (unlock ${DEVICE_NAME} and keep it awake; DEBUG builds mirror AppLog to stdout)"
+  if $TUNNEL && [[ -n "${TUNNEL_URL:-}" ]]; then
+    echo "  Backend tunnel: ${TUNNEL_URL} (stop later with: $0 --stop-tunnel)"
+  fi
+  exec xcrun devicectl device process launch --console --terminate-existing \
+    --device "$DEVICE_ID" "$BUNDLE_ID"
+fi
 
 echo "→ Launching… (unlock ${DEVICE_NAME} and keep the screen on)"
 launched=false

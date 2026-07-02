@@ -78,3 +78,9 @@ struct TokenResponse: Codable, Equatable {
         case tokenType = "token_type"
     }
 }
+
+/// GET /auth/me response body.
+struct UserOut: Codable, Equatable {
+    let id: String
+    let email: String
+}

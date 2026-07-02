@@ -66,6 +66,7 @@ See `Makefile` for UI tests, Tuist generation, and local dev scripts.
 
 The agent can build, launch, screenshot, read, and interact with the iOS app from the terminal using `idb` (Facebook iOS Development Bridge) or the `ios-simulator` MCP server.
 
+- **Boot first:** Run `./scripts/ios-sim.sh --headless` if no simulator is booted — `idb` commands fail silently against a shutdown device.
 - **Launch headless:** `./scripts/ios-sim.sh --headless --clean-state --verify-launch 5 --screenshot /tmp/screen.png`
 - **Read screen (accessibility tree):** `idb ui describe-all --udid <UDID>` — returns JSON with every label, button, frame
 - **Tap / type / swipe:** `idb ui tap <x> <y>`, `idb ui text "string"`, `idb ui swipe <x1> <y1> <x2> <y2>`
@@ -78,7 +79,7 @@ The agent can build, launch, screenshot, read, and interact with the iOS app fro
 ngrok tunnel → inject `BACKEND_URL` → `xcodebuild -destination generic/platform=iOS` →
 `xcrun devicectl device install app` → `... process launch`.
 
-- **Command:** `make ios-device` (or `./scripts/ios-device.sh --verify-launch 5 --logs`).
+- **Command:** `make ios-device` (or `./scripts/ios-device.sh --verify-launch 5 --console`).
 - **Signing:** automatic. Team ID is auto-detected from the `Apple Development` keychain cert;
   override with `--team`/`IOS_DEVELOPMENT_TEAM`. **Do not commit a real team ID** — keep it in the
   gitignored `Config-Debug.xcconfig` or let the script detect it. Bundle id must be unique to the
@@ -88,8 +89,12 @@ ngrok tunnel → inject `BACKEND_URL` → `xcodebuild -destination generic/platf
   authtoken; use `--domain` for a stable reserved URL.
 - **Entitlements:** dev builds use `StarterApp.dev.entitlements` (Sign In with Apple kept, Apple Pay
   dropped); `--full-entitlements` uses the real one for parity with Release.
-- **USB recommended:** over Wi-Fi, `devicectl` *launch* and `idevicesyslog` (`--logs`) are flaky;
-  build/install still work. Flags: `--no-tunnel`, `--device-id`, `--regen`, `--stop-tunnel`.
+- **Logs over Wi-Fi:** `--console` launches attached via `devicectl process launch --console` and
+  streams stdout. DEBUG builds call `AppLog.startConsoleMirror()` so `[category] message` lines
+  appear in the terminal without USB. Blocks until the app exits (Ctrl-C to stop).
+- **Full syslog (USB):** `--logs` uses `idevicesyslog` and needs a cable; over Wi-Fi it is
+  flaky/unavailable. Detached launch (`--verify-launch`) is also more reliable over USB.
+- **Flags:** `--no-tunnel`, `--device-id`, `--regen`, `--stop-tunnel`, `--console`, `--logs`.
 
 ## Agent-only docs (not GitHub Pages)
 

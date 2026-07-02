@@ -16,6 +16,10 @@ struct StarterAppApp: App {
     @State private var purchaseService = PurchaseService()
 
     init() {
+        #if DEBUG
+        // Stream os_log to stdout so `ios-device.sh --console` shows logs over Wi-Fi.
+        AppLog.startConsoleMirror()
+        #endif
         Self.configurePostHogIfNeeded()
         Self.configureRevenueCat()
 

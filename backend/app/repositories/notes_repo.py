@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import uuid
+from typing import cast
 
 from sqlalchemy import delete, func, select, update
+from sqlalchemy.engine import CursorResult
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Note
@@ -25,17 +27,15 @@ async def list_notes(db: AsyncSession, user_id: uuid.UUID) -> list[Note]:
 
 async def get_note(db: AsyncSession, note_id: uuid.UUID, user_id: uuid.UUID) -> Note | None:
     """Return a single note by ID if it belongs to *user_id*."""
-    result = await db.execute(
-        select(Note).where(Note.id == note_id, Note.user_id == user_id)
-    )
+    result = await db.execute(select(Note).where(Note.id == note_id, Note.user_id == user_id))
     return result.scalar_one_or_none()
 
 
 async def create_note(db: AsyncSession, user_id: uuid.UUID, data: NoteIn) -> Note:
-    """Create and persist a new note."""
+    """Stage a new note; caller commits the session."""
     note = Note(user_id=user_id, **data.model_dump())
     db.add(note)
-    await db.commit()
+    await db.flush()
     await db.refresh(note)
     return note
 
@@ -46,17 +46,15 @@ async def update_note(
     """Update a note if it belongs to *user_id*. Returns the updated note or None."""
     values = data.model_dump(exclude_unset=True)
     if values:
+        values["updated_at"] = func.now()
         await db.execute(
             update(Note).where(Note.id == note_id, Note.user_id == user_id).values(**values)
         )
-        await db.commit()
+        await db.flush()
     return await get_note(db, note_id, user_id)
 
 
 async def delete_note(db: AsyncSession, note_id: uuid.UUID, user_id: uuid.UUID) -> bool:
     """Delete a note if it belongs to *user_id*. Returns True if a row was deleted."""
-    result = await db.execute(
-        delete(Note).where(Note.id == note_id, Note.user_id == user_id)
-    )
-    await db.commit()
-    return result.rowcount > 0
+    result = await db.execute(delete(Note).where(Note.id == note_id, Note.user_id == user_id))
+    return cast(CursorResult[tuple[()]], result).rowcount > 0

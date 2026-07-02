@@ -1,9 +1,10 @@
 """Integration tests for profile endpoints with real SQLAlchemy ORM."""
 
 import pytest
+from tests.api.jwt_route_helpers import auth_header
+
 from app.repositories import profile_repo, user_repo
 from app.services.auth_service import hash_password
-from tests.api.jwt_route_helpers import auth_header
 
 pytestmark = pytest.mark.integration
 

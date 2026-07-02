@@ -1,7 +1,5 @@
 import uuid
 
-import pytest
-
 from app.services.auth_service import (
     create_access_token,
     create_refresh_token_value,

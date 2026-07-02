@@ -44,7 +44,7 @@ class Settings(BaseSettings):
     rate_limit_default: str = Field(default="100/minute", min_length=1)
 
     database_url: AnyUrl = Field(..., description="asyncpg DSN")
-    jwt_secret: str = Field(..., description="HS256 signing secret — min 32 chars")
+    jwt_secret: str = Field(..., min_length=32, description="HS256 signing secret — min 32 chars")
     jwt_access_token_expire_seconds: int = 3600
     jwt_refresh_token_expire_seconds: int = 2_592_000  # 30 days
 

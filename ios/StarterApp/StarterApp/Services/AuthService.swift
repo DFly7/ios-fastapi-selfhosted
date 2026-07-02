@@ -117,9 +117,9 @@ final class AuthService {
     // MARK: – HTTP helpers
 
     private static let decoder: JSONDecoder = {
-        let d = JSONDecoder()
-        d.dateDecodingStrategy = .iso8601
-        return d
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return decoder
     }()
 
     private func post<B: Encodable, R: Decodable>(path: String, body: B) async throws -> R {
@@ -130,7 +130,7 @@ final class AuthService {
         let (data, response) = try await URLSession.shared.data(for: req)
         guard let http = response as? HTTPURLResponse else { throw AuthError.network }
         guard (200..<300).contains(http.statusCode) else {
-            let msg = (try? JSONDecoder().decode(APIErrorBody.self, from: data))?.detail
+            let msg = (try? JSONDecoder().decode(APIErrorBody.self, from: data))?.message
             throw AuthError.server(http.statusCode, msg ?? "Unknown error")
         }
         return try Self.decoder.decode(R.self, from: data)
@@ -177,6 +177,8 @@ final class AuthService {
             case .server(409, _): return "An account with this email already exists."
             case .server(401, _): return "Incorrect email or password."
             case .server(403, _): return "Account disabled."
+            case .server(429, _):
+                return "Slow down! You've made too many requests. Please try again shortly."
             case .server: return "Something went wrong. Please try again."
             case .network: return "No internet connection. Please check your network."
             }
@@ -196,7 +198,16 @@ final class AuthService {
 
 // MARK: – Supporting types
 
-private struct APIErrorBody: Decodable { let detail: String }
+private struct APIErrorBody: Decodable {
+    let detail: String?
+    let error: String?
+
+    var message: String? {
+        if let detail, !detail.isEmpty { return detail }
+        if let error, !error.isEmpty { return error }
+        return nil
+    }
+}
 private struct EmptyResponse: Decodable {}
 
 private enum AuthError: Error {

@@ -71,6 +71,22 @@ struct AppErrorTests {
         let message = AppError.message(from: data, fallback: "fallback text")
         #expect(message == "fallback text")
     }
+
+    @Test("message(from:fallback:) extracts error string when detail is absent")
+    func messageExtractsErrorString() {
+        let body = #"{"error": "Too Many Requests", "status_code": 429}"#
+        let data = Data(body.utf8)
+        let message = AppError.message(from: data, fallback: "fallback")
+        #expect(message == "Too Many Requests")
+    }
+
+    @Test("message(from:fallback:) prefers detail over error when both are present")
+    func messagePrefersDetailOverError() {
+        let body = #"{"detail": "Too many attempts.", "error": "Too Many Requests"}"#
+        let data = Data(body.utf8)
+        let message = AppError.message(from: data, fallback: "fallback")
+        #expect(message == "Too many attempts.")
+    }
 }
 
 // MARK: - GeneratedModels encoding

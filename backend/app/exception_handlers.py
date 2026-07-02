@@ -134,6 +134,7 @@ async def rate_limit_exceeded_handler(request: Request, exc: RateLimitExceeded) 
         status_code=status.HTTP_429_TOO_MANY_REQUESTS,
         content={
             "error": "Too Many Requests",
+            "detail": "Too many attempts. Please try again later.",
             "status_code": status.HTTP_429_TOO_MANY_REQUESTS,
             "request_id": request_id,
         },

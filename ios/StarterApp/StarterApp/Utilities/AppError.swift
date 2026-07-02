@@ -66,19 +66,26 @@ enum AppError: LocalizedError {
     /// - `{"detail": [{"loc": […], "msg": "…", "type": "…"}]}` — Pydantic validation errors
     ///
     /// Falls back to `fallback` when neither shape matches (e.g. plain-text or empty body).
+    /// Also accepts `{"error": "…"}` bodies (e.g. rate-limit responses) when `detail` is absent.
     static func message(from data: Data, fallback: String) -> String {
         guard
-            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
-            let detail = json["detail"]
+            let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return fallback }
 
-        if let string = detail as? String, !string.isEmpty {
-            return string
+        if let detail = json["detail"] {
+            if let string = detail as? String, !string.isEmpty {
+                return string
+            }
+            if let array = detail as? [[String: Any]] {
+                let messages = array.compactMap { $0["msg"] as? String }
+                if !messages.isEmpty { return messages.joined(separator: "; ") }
+            }
         }
-        if let array = detail as? [[String: Any]] {
-            let messages = array.compactMap { $0["msg"] as? String }
-            if !messages.isEmpty { return messages.joined(separator: "; ") }
+
+        if let error = json["error"] as? String, !error.isEmpty {
+            return error
         }
+
         return fallback
     }
 }

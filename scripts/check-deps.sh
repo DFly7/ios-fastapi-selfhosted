@@ -145,6 +145,11 @@ check_tool "swiftlint" \
 
 check_simulator
 
+check_tool "idb" \
+  "idb --version" \
+  "brew install idb-companion  (Facebook iOS Development Bridge — UI automation)" \
+  "optional"
+
 # ── Distribution (optional) ──────────────────────────────────────────────────
 echo ""
 printf "  %bDistribution%b %b(optional — only needed for beta/release)%b\n" \

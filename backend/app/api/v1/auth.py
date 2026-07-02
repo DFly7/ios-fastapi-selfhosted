@@ -4,14 +4,15 @@ import uuid
 from datetime import UTC, datetime, timedelta
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Request, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.auth import verify_jwt
 from app.core.config import get_settings
+from app.core.rate_limit import limiter
 from app.db.session import get_db
 from app.repositories import profile_repo, refresh_token_repo, user_repo
-from app.schemas.auth import LoginRequest, RefreshRequest, RegisterRequest, TokenResponse
+from app.schemas.auth import LoginRequest, RefreshRequest, RegisterRequest, TokenResponse, UserOut
 from app.services.auth_service import (
     create_access_token,
     create_refresh_token_value,
@@ -29,14 +30,13 @@ def _make_token_response(db: AsyncSession, user_id: uuid.UUID):
     access = create_access_token(user_id)
     raw_refresh = create_refresh_token_value()
     rt_hash = hash_refresh_token(raw_refresh)
-    expires_at = datetime.now(UTC) + timedelta(
-        seconds=_settings.jwt_refresh_token_expire_seconds
-    )
+    expires_at = datetime.now(UTC) + timedelta(seconds=_settings.jwt_refresh_token_expire_seconds)
     return TokenResponse(access_token=access, refresh_token=raw_refresh), rt_hash, expires_at
 
 
 @router.post("/register", response_model=TokenResponse, status_code=status.HTTP_201_CREATED)
-async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/minute")
+async def register(request: Request, body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     existing = await user_repo.get_by_email(db, body.email)
     if existing:
         raise HTTPException(status_code=409, detail="Email already registered")
@@ -44,7 +44,6 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
     hashed = hash_password(body.password)
     user = await user_repo.create_user(db, body.email, hashed)
     await profile_repo.create_profile(db, user.id, display_name=body.display_name)
-    await db.commit()
 
     token_resp, rt_hash, expires_at = _make_token_response(db, user.id)
     await refresh_token_repo.create_refresh_token(db, user.id, rt_hash, expires_at)
@@ -53,7 +52,8 @@ async def register(body: RegisterRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/token", response_model=TokenResponse)
-async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/minute")
+async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends(get_db)):
     user = await user_repo.get_by_email(db, body.email)
     if not user or not verify_password(body.password, user.hashed_password):
         raise HTTPException(status_code=401, detail="Invalid email or password")
@@ -67,7 +67,8 @@ async def login(body: LoginRequest, db: AsyncSession = Depends(get_db)):
 
 
 @router.post("/refresh", response_model=TokenResponse)
-async def refresh(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
+@limiter.limit("5/minute")
+async def refresh(request: Request, body: RefreshRequest, db: AsyncSession = Depends(get_db)):
     rt_hash = hash_refresh_token(body.refresh_token)
     stored = await refresh_token_repo.get_by_hash(db, rt_hash)
     if not stored or stored.expires_at.replace(tzinfo=UTC) < datetime.now(UTC):
@@ -85,10 +86,10 @@ async def logout(body: RefreshRequest, db: AsyncSession = Depends(get_db)):
     await refresh_token_repo.delete_by_hash(db, rt_hash)
 
 
-@router.get("/me")
+@router.get("/me", response_model=UserOut)
 async def me(auth: dict = Depends(verify_jwt), db: AsyncSession = Depends(get_db)):
     user_id = uuid.UUID(auth["payload"]["sub"])
     user = await user_repo.get_by_id(db, user_id)
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    return {"id": str(user.id), "email": user.email}
+    return UserOut(id=str(user.id), email=user.email)

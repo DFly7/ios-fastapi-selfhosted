@@ -1,9 +1,13 @@
 """Integration tests for notes endpoints with real SQLAlchemy ORM."""
 
+import asyncio
+from datetime import datetime
+
 import pytest
+from tests.api.jwt_route_helpers import auth_header
+
 from app.repositories import profile_repo, user_repo
 from app.services.auth_service import hash_password
-from tests.api.jwt_route_helpers import auth_header
 
 pytestmark = pytest.mark.integration
 
@@ -108,6 +112,32 @@ async def test_patch_note_updates_title(client, db_session):
     assert data["title"] == "Updated"
     assert data["body"] == "Content"
     assert data["id"] == note_id
+
+
+@pytest.mark.asyncio
+async def test_patch_note_updates_updated_at(client, db_session):
+    """PATCH /me/notes/{id} bumps updated_at."""
+    user = await _create_user_and_profile(db_session, "notes_updated_at@example.com")
+    hdrs = auth_header(user.id)
+
+    resp = await client.post(
+        "/api/v1/me/notes",
+        json={"title": "Original", "body": "Content"},
+        headers=hdrs,
+    )
+    note_id = resp.json()["id"]
+    original_updated_at = datetime.fromisoformat(resp.json()["updated_at"])
+
+    await asyncio.sleep(0.05)
+
+    resp = await client.patch(
+        f"/api/v1/me/notes/{note_id}",
+        json={"title": "Updated"},
+        headers=hdrs,
+    )
+    assert resp.status_code == 200
+    patched_updated_at = datetime.fromisoformat(resp.json()["updated_at"])
+    assert patched_updated_at >= original_updated_at
 
 
 @pytest.mark.asyncio

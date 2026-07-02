@@ -67,14 +67,23 @@ Target: Raspberry Pi running Docker (linux/arm64). Deployment is via GitHub Acti
 
 The agent can build, launch, screenshot, read, and interact with the iOS app entirely from the terminal.
 
-**Launch headlessly:**
+**Boot a simulator first** if none is running (required before `idb` UI commands):
+
 ```bash
 ./scripts/ios-sim.sh --headless --clean-state --verify-launch 5 --screenshot /tmp/screen.png
 ```
 
 **Read the screen** (accessibility tree via idb):
 ```bash
-idb ui describe-all --udid $(xcrun simctl list devices booted -j | python3 -c "import sys,json; print(json.load(sys.stdin)['devices'].values().__iter__().__next__()[0]['udid'])")
+idb ui describe-all --udid $(xcrun simctl list devices booted -j | python3 -c "
+import sys, json
+for runtime in json.load(sys.stdin).get('devices', {}).values():
+    for d in runtime:
+        if d.get('state') == 'Booted':
+            print(d['udid'])
+            raise SystemExit
+raise SystemExit('No booted simulator — run ./scripts/ios-sim.sh first')
+")
 ```
 
 **Interact** (tap, type, swipe):
@@ -88,13 +97,16 @@ idb ui swipe <x1> <y1> <x2> <y2> --udid <UDID>
 
 **MCP tools (ios-simulator):** `ui_describe_all`, `ui_tap`, `ui_type`, `screenshot` — available as native tool calls when the MCP server is running.
 
+**MCP postgres-local:** requires Postgres on `localhost:5432` — run `make dev` or `docker compose up -d db` first. The wrapper script fails fast with a clear message if the database is not ready.
+
 ## iOS physical device (`make ios-device`)
 
 Build, sign, install, and launch on a paired iPhone in one command:
 
 ```bash
 make ios-device            # auto team, auto tunnel, first paired iPhone
-./scripts/ios-device.sh --verify-launch 5 --logs
+./scripts/ios-device.sh --console   # launch attached, stream AppLog over Wi-Fi (DEBUG)
+./scripts/ios-device.sh --verify-launch 5 --logs   # detached launch + USB syslog
 ```
 
 The script (`scripts/ios-device.sh`) chains: start/reuse an **ngrok** tunnel → inject its
@@ -112,10 +124,13 @@ URL into `BACKEND_URL` → `xcodebuild -destination generic/platform=iOS` → `d
   For a stable URL, reserve a domain and pass `--domain <name>.ngrok-free.dev`.
 - **Entitlements:** device dev builds use `StarterApp.dev.entitlements` (Sign In with Apple kept,
   Apple Pay dropped — it needs a merchant ID). `--full-entitlements` uses the real one.
-- **USB strongly recommended.** Over Wi-Fi, build/install are reliable but `devicectl` *launch*
-  and `idevicesyslog` logs are flaky/unavailable. Connect a cable for reliable launch + `--logs`.
+- **Logs over Wi-Fi:** `--console` attaches via `devicectl process launch --console` and streams
+  stdout. DEBUG builds mirror `AppLog` (`AppLog.startConsoleMirror()` in `StarterAppApp`) so you
+  see `[category] message` lines in the terminal without USB. Blocks until the app exits (Ctrl-C).
+- **Full syslog (USB):** `--logs` uses `idevicesyslog` and needs a cable. Detached launch
+  (`--verify-launch`) is also more reliable over USB than wireless.
 
-Useful flags: `--no-tunnel`, `--domain`, `--device-id`, `--regen`, `--stop-tunnel`, `--logs`.
+Useful flags: `--no-tunnel`, `--domain`, `--device-id`, `--regen`, `--stop-tunnel`, `--console`, `--logs`.
 
 ## Skills
 

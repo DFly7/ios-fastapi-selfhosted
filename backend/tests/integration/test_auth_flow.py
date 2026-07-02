@@ -31,7 +31,7 @@ async def test_register_and_login(client):
 
     resp = await client.post(
         "/api/v1/auth/register",
-        json={"email": "alice@example.com", "password": "other"},
+        json={"email": "alice@example.com", "password": "otherpass1"},
     )
     assert resp.status_code == 409
 

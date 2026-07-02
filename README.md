@@ -217,7 +217,7 @@ Services:
   Adminer DB   → http://127.0.0.1:8080
 ```
 
-For a **physical iPhone**, use `make ios-device` (one command: ngrok tunnel → inject `BACKEND_URL` → build → sign → install → launch). It auto-detects your signing team from the keychain; set a unique `PRODUCT_BUNDLE_IDENTIFIER` in your gitignored `Config-Debug.xcconfig` first, and run `ngrok config add-authtoken <token>` once. USB is recommended (over Wi-Fi, launch/log streaming is flaky). Extra `make dev` flags: `ARGS="--regen"` (tuist install + generate), `ARGS="--no-ios"` (services only), `ARGS="--sim-logs"`.
+For a **physical iPhone**, use `make ios-device` (one command: ngrok tunnel → inject `BACKEND_URL` → build → sign → install → launch). It auto-detects your signing team from the keychain; set a unique `PRODUCT_BUNDLE_IDENTIFIER` in your gitignored `Config-Debug.xcconfig` first, and run `ngrok config add-authtoken <token>` once. Stream DEBUG logs over Wi-Fi with `make ios-device ARGS="--console"`; use `--logs` for full USB syslog. Extra `make dev` flags: `ARGS="--regen"` (tuist install + generate), `ARGS="--no-ios"` (services only), `ARGS="--sim-logs"`.
 
 ### 4. Open the iOS project in Xcode (optional)
 

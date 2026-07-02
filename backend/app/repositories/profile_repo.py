@@ -29,10 +29,10 @@ async def update_profile(
     values = data.model_dump(exclude_unset=True, exclude={"is_pro"})
     if values:
         await db.execute(update(Profile).where(Profile.id == user_id).values(**values))
-        await db.commit()
+        await db.flush()
     return await get_profile(db, user_id)
 
 
 async def set_pro_status(db: AsyncSession, user_id: uuid.UUID, *, is_pro: bool) -> None:
     await db.execute(update(Profile).where(Profile.id == user_id).values(is_pro=is_pro))
-    await db.commit()
+    await db.flush()

@@ -9,7 +9,12 @@ from app.core.auth import verify_jwt
 from app.db.session import get_db
 from app.repositories import notes_repo
 from app.schemas.notes import NoteIn, NoteOut, NoteUpdate
-from app.services.notes_service import NotesLimitExceeded, create_user_note, update_user_note, delete_user_note
+from app.services.notes_service import (
+    NotesLimitExceeded,
+    create_user_note,
+    delete_user_note,
+    update_user_note,
+)
 
 router = APIRouter(prefix="/me/notes", tags=["notes"])
 
@@ -38,7 +43,7 @@ async def create_note(
     try:
         return await create_user_note(db, user_id, body)
     except NotesLimitExceeded as e:
-        raise HTTPException(status_code=422, detail=str(e))
+        raise HTTPException(status_code=422, detail=str(e)) from e
 
 
 @router.get("/{note_id}", response_model=NoteOut)

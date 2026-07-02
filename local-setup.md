@@ -11,7 +11,7 @@ Supabase in this stack.
 | **mise** | `curl https://mise.run \| sh` — then `mise install` from the repo root to get Python, uv, and Tuist at the versions pinned in `.mise.toml` |
 | **Docker Desktop** | https://www.docker.com/products/docker-desktop/ (runs Postgres + FastAPI + Adminer) |
 | **ngrok** *(physical device only)* | `brew install ngrok`, then `ngrok config add-authtoken <token>` once. Needed so a phone can reach the backend over HTTPS. |
-| **libimobiledevice** *(optional)* | `brew install libimobiledevice` — for streaming physical-device logs via `ios-device.sh --logs` (requires USB). |
+| **libimobiledevice** *(optional)* | `brew install libimobiledevice` — for full device syslog via `ios-device.sh --logs` (USB). For Wi-Fi, use `--console` instead (DEBUG AppLog mirror, no extra deps). |
 
 The Simulator needs **no** tunnel — it shares the Mac's network and talks to `http://localhost:8000` directly.
 
@@ -87,7 +87,8 @@ One command handles the tunnel, signing, install, and launch:
 ```sh
 make ios-device
 # or, with options:
-./scripts/ios-device.sh --verify-launch 5 --logs
+./scripts/ios-device.sh --console              # stream AppLog over Wi-Fi (DEBUG, blocks until exit)
+./scripts/ios-device.sh --verify-launch 5 --logs   # detached launch + USB syslog
 ```
 
 What it does: start (or reuse) an **ngrok** tunnel to the backend → write that HTTPS URL into
@@ -104,11 +105,11 @@ Notes:
 - **Signing:** team auto-detected from your `Apple Development` keychain cert; override with
   `--team <ID>` / `IOS_DEVELOPMENT_TEAM`. Dev builds use `StarterApp.dev.entitlements` (Sign In
   with Apple kept, Apple Pay dropped — it needs a merchant ID); `--full-entitlements` uses the real one.
-- **Use USB.** Over Wi-Fi, build + install are reliable but `devicectl` *launch* and `--logs`
-  (`idevicesyslog`) are flaky/unavailable. A cable makes both reliable.
+- **Logs:** `--console` streams DEBUG `AppLog` over Wi-Fi (no USB). `--logs` needs USB +
+  `libimobiledevice` for full syslog. Detached launch (`--verify-launch`) is more reliable over USB.
 - Stop the tunnel later with `./scripts/ios-device.sh --stop-tunnel`.
 
-Other flags: `--no-tunnel` (BACKEND_URL already reachable), `--device-id <udid>`, `--regen`.
+Other flags: `--no-tunnel` (BACKEND_URL already reachable), `--device-id <udid>`, `--regen`, `--console`.
 
 ---
 

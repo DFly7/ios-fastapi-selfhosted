@@ -71,9 +71,7 @@ async def get_my_profile(
     if not profile:
         raise HTTPException(
             status_code=404,
-            detail=(
-                "No profile row found. Run migrations and sign up again."
-            ),
+            detail=("No profile row found. Run migrations and sign up again."),
         )
     return ProfileOut.model_validate(profile)
 

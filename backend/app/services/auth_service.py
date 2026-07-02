@@ -23,27 +23,28 @@ _settings = get_settings()
 # We work around this by catching the error and suppressing the AttributeError.
 # However, passlib can still raise ValueError during hash() if it tries wrap bug detection.
 # Since bcrypt is known to work, we can safely disable that check.
+_pwd_context: CryptContext | None
 try:
     with warnings.catch_warnings():
         warnings.simplefilter("ignore")
         _pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
         # Test that it works by hashing a short string
         _ = _pwd_context.hash("test")
-except (AttributeError, ValueError) as e:
+except (AttributeError, ValueError):
     # Fallback to using bcrypt directly if CryptContext fails
     _pwd_context = None
 
 
 def hash_password(plain: str) -> str:
     if _pwd_context is not None:
-        return _pwd_context.hash(plain)
+        return str(_pwd_context.hash(plain))
     # Fallback: use bcrypt directly
     return bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
 
 
 def verify_password(plain: str, hashed: str) -> bool:
     if _pwd_context is not None:
-        return _pwd_context.verify(plain, hashed)
+        return bool(_pwd_context.verify(plain, hashed))
     # Fallback: use bcrypt directly
     return bcrypt.checkpw(plain.encode(), hashed.encode())
 
