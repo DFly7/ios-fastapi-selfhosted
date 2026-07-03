@@ -105,6 +105,31 @@ class Settings(BaseSettings):
             return v.lower() in ("1", "true", "yes")
         return v
 
+    @field_validator("jwt_secret")
+    @classmethod
+    def reject_placeholder_secret(cls, v: str) -> str:
+        """Refuse to start with a shipped placeholder secret.
+
+        `min_length=32` alone is not enough: the `.env.example` placeholder is
+        long enough to pass it, so an agent that runs bootstrap but skips
+        `openssl rand -hex 32` would silently sign JWTs with a predictable key.
+        """
+        lowered = v.lower()
+        placeholder_markers = (
+            "change-me",
+            "changeme",
+            "replace-me",
+            "replaceme",
+            "your-secret",
+            "xxxx",
+        )
+        if any(marker in lowered for marker in placeholder_markers):
+            raise ValueError(
+                "JWT_SECRET is still a placeholder — generate a real one with "
+                "`openssl rand -hex 32` and set it in backend/.env"
+            )
+        return v
+
 
 @lru_cache
 def get_settings() -> Settings:

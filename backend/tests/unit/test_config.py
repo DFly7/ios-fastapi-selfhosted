@@ -55,6 +55,30 @@ class TestEmptyToNone:
 
 
 # ---------------------------------------------------------------------------
+# JWT secret validation
+# ---------------------------------------------------------------------------
+
+
+class TestJwtSecretValidation:
+    @pytest.mark.parametrize(
+        "placeholder",
+        [
+            "change-me-generate-with-openssl-rand-hex-32",
+            "REPLACE-ME-with-a-real-secret-value-here",
+            "your-secret-goes-here-please-change-it",
+            "appl_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx",
+        ],
+    )
+    def test_placeholder_secret_is_rejected(self, placeholder: str) -> None:
+        with pytest.raises(ValidationError):
+            make(jwt_secret=placeholder)
+
+    def test_real_secret_is_accepted(self) -> None:
+        secret = "a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6"  # 32 chars, no placeholder markers
+        assert make(jwt_secret=secret).jwt_secret == secret
+
+
+# ---------------------------------------------------------------------------
 # Development defaults
 # ---------------------------------------------------------------------------
 

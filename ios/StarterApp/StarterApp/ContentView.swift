@@ -133,7 +133,7 @@ struct ContentView: View {
         Section("Backend (JWT)") {
             VStack(alignment: .leading, spacing: 8) {
                 Text(
-                    "Proves the app, Supabase session, and FastAPI `verify_jwt` share the same token. "
+                    "Proves the app's session and the FastAPI `verify_jwt` dependency share the same token. "
                         + "Backend: \(APIConfig.backendURL.host ?? APIConfig.backendURL.absoluteString)"
                 )
                 .font(.footnote)

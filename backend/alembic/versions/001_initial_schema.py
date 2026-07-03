@@ -1,4 +1,4 @@
-"""Initial schema: users, profiles, notes, refresh_tokens, waitlist
+"""Initial schema: users, profiles, notes, refresh_tokens
 
 Revision ID: 001
 Revises:
@@ -80,20 +80,8 @@ def upgrade() -> None:
     )
     op.create_index("refresh_tokens_user_id_idx", "refresh_tokens", ["user_id"])
 
-    op.create_table(
-        "waitlist",
-        sa.Column("id", UUID(as_uuid=True), primary_key=True),
-        sa.Column("email", sa.String(255), unique=True, nullable=False),
-        sa.Column("phone", sa.String(50), nullable=True),
-        sa.Column("ip_address", sa.String(45), nullable=True),
-        sa.Column(
-            "created_at", sa.DateTime(timezone=True), server_default=sa.func.now(), nullable=False
-        ),
-    )
-
 
 def downgrade() -> None:
-    op.drop_table("waitlist")
     op.drop_index("refresh_tokens_user_id_idx", "refresh_tokens")
     op.drop_table("refresh_tokens")
     op.drop_index("notes_user_id_idx", "notes")

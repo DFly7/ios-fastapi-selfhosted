@@ -33,6 +33,10 @@ struct StarterAppApp: App {
     }
 
     private static func configureRevenueCat() {
+        guard APIConfig.isRevenueCatConfigured else {
+            AppLog.purchases.info("RevenueCat skipped — API key is not configured")
+            return
+        }
         Purchases.configure(withAPIKey: APIConfig.revenueCatAPIKey)
         #if DEBUG
         Purchases.logLevel = .debug

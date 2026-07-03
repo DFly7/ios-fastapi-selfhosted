@@ -21,10 +21,11 @@ final class PurchaseService {
 
     // MARK: - Identity
 
-    /// Logs the given Supabase user UUID into RevenueCat so entitlements follow the account,
-    /// not the device. Must be called after a successful Supabase sign-in and before any
+    /// Logs the given authenticated user UUID into RevenueCat so entitlements follow the account,
+    /// not the device. Must be called after a successful sign-in and before any
     /// purchase is initiated.
     func identify(userId: String) async {
+        guard APIConfig.isRevenueCatConfigured else { return }
         AppLog.purchases.info("Identifying RC user: \(userId, privacy: .private(mask: .hash))")
         do {
             let (info, _) = try await Purchases.shared.logIn(userId)
@@ -35,8 +36,9 @@ final class PurchaseService {
         }
     }
 
-    /// Logs out the current RevenueCat user (called on Supabase sign-out).
+    /// Logs out the current RevenueCat user (called on sign-out).
     func reset() async {
+        guard APIConfig.isRevenueCatConfigured else { return }
         AppLog.purchases.info("Resetting RC identity (sign-out)")
         do {
             customerInfo = try await Purchases.shared.logOut()

@@ -19,15 +19,14 @@
       BRAND_COLOR:     "#6366f1",          // indigo default — change to match your brand
       BRAND_COLOR_DARK:"#4f46e5",          // darker shade used for hover states
 
-      // ── Supabase ─────────────────────────────────────────────────────────
-      // ⚠️  ALWAYS use your ANON key here — NEVER the service role key.
-      //    The anon key is designed to be public. The service role key is not.
-      SUPABASE_URL:      "https://YOUR_PROJECT_REF.supabase.co",
-      SUPABASE_ANON_KEY: "YOUR_ANON_KEY",
+      // ── Waitlist endpoint ────────────────────────────────────────────────
+      // This template ships with NO waitlist backend. To make the form work,
+      // add your own endpoint (e.g. a FastAPI route) that accepts { email, phone }
+      // and set its URL here. Until then the form shows a "not configured" message.
+      WAITLIST_ENDPOINT: "",               // e.g. "https://your-api.example.com/api/v1/waitlist"
 
       // ── Form ─────────────────────────────────────────────────────────────
       PHONE_ENABLED:   true,               // set false to hide the phone field entirely
-      RATE_LIMIT:      5,                  // must match migration SQL (cosmetic only — DB enforces it)
     };
   </script>
   <!-- ═══════════════════════════════════════════════════════════════════════ -->
@@ -292,10 +291,7 @@
     Your email is safe with us. No spam, ever.
   </footer>
 
-  <!-- Supabase JS (ESM CDN — no build step required) -->
   <script type="module">
-    import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm';
-
     // ── Apply config to DOM ──────────────────────────────────────────────
     document.title                                    = `${CONFIG.APP_NAME} — Waitlist`;
     document.getElementById('app-name').textContent   = CONFIG.APP_NAME;
@@ -311,15 +307,14 @@
       document.getElementById('phone-field-wrapper').style.display = 'none';
     }
 
-    // ── Guard: warn in console if placeholder keys are still in place ────
-    if (CONFIG.SUPABASE_URL.includes('YOUR_PROJECT_REF') || CONFIG.SUPABASE_ANON_KEY === 'YOUR_ANON_KEY') {
+    // ── Guard: warn in console if no waitlist endpoint is configured ────
+    if (!CONFIG.WAITLIST_ENDPOINT) {
       console.error(
-        '[Waitlist] Supabase is not configured. ' +
-        'Edit the CONFIG block at the top of docs/index.html and set SUPABASE_URL and SUPABASE_ANON_KEY.'
+        '[Waitlist] No endpoint configured. ' +
+        'Set WAITLIST_ENDPOINT in the CONFIG block at the top of docs/index.html ' +
+        'to your own backend route that accepts { email, phone }.'
       );
     }
-
-    const supabase = createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
 
     // ── Helpers ──────────────────────────────────────────────────────────
     const form       = document.getElementById('waitlist-form');
@@ -371,30 +366,33 @@
         return;
       }
 
+      // No backend wired up yet — tell the user instead of silently failing.
+      if (!CONFIG.WAITLIST_ENDPOINT) {
+        showError('The waitlist is not configured yet. See the browser console for setup steps.');
+        return;
+      }
+
       setLoading(true);
 
       try {
-        const { error } = await supabase
-          .from('waitlist')
-          .insert({ email, phone });
+        const res = await fetch(CONFIG.WAITLIST_ENDPOINT, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, phone }),
+        });
 
-        if (error) {
+        if (!res.ok) {
           // Duplicate email
-          if (error.code === '23505') {
+          if (res.status === 409) {
             showError("You're already on the list! We'll be in touch.");
             return;
           }
-          // Rate limit (our custom trigger raises 'rate_limit_exceeded')
-          if (error.message?.includes('rate_limit_exceeded') || error.code === 'P0001') {
+          // Rate limited
+          if (res.status === 429) {
             showError('Too many sign-ups from your connection. Please try again later.');
             return;
           }
-          // Supabase not configured yet
-          if (CONFIG.SUPABASE_URL.includes('YOUR_PROJECT_REF')) {
-            showError('The waitlist is not configured yet. Check the browser console for details.');
-            return;
-          }
-          throw error;
+          throw new Error(`Request failed: ${res.status}`);
         }
 
         // Success

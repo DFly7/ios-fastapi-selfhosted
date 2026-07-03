@@ -74,15 +74,3 @@ class RefreshToken(Base):
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-
-
-class Waitlist(Base):
-    __tablename__ = "waitlist"
-
-    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
-    email: Mapped[str] = mapped_column(String(255), unique=True, nullable=False)
-    phone: Mapped[str | None] = mapped_column(String(50))
-    ip_address: Mapped[str | None] = mapped_column(String(45))
-    created_at: Mapped[datetime] = mapped_column(
-        DateTime(timezone=True), server_default=func.now(), nullable=False
-    )

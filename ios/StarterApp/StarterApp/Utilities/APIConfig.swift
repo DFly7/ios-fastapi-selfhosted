@@ -56,6 +56,20 @@ enum APIConfig {
         return key
     }()
 
+    /// True when `REVENUECAT_API_KEY` is non-empty and is not the placeholder value.
+    ///
+    /// Set `REVENUECAT_API_KEY` in xcconfig. Leave it empty or as the default placeholder
+    /// (`appl_xxxxxxxxxxxxxxxx`) to skip SDK initialisation and silence "Invalid API Key" noise.
+    static var isRevenueCatConfigured: Bool {
+        guard let key = infoDictionary["RevenueCatAPIKey"] as? String,
+              !key.isEmpty,
+              key != "appl_xxxxxxxxxxxxxxxx"
+        else {
+            return false
+        }
+        return true
+    }
+
     /// True when `POSTHOG_API_KEY` is non-empty and PostHog is not explicitly turned off.
     ///
     /// Set `POSTHOG_ENABLED` to `TRUE` or `FALSE` in xcconfig. Leave `POSTHOG_API_KEY` empty to disable
