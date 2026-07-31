@@ -5,6 +5,8 @@ WORKDIR /app
 # Compile bytecode for faster startup; copy files instead of symlinks for portability
 ENV UV_COMPILE_BYTECODE=1
 ENV UV_LINK_MODE=copy
+# Slow/flaky PyPI pulls during image build (default 30s is too tight on some networks)
+ENV UV_HTTP_TIMEOUT=120
 
 # Install dependencies first (separate layer — only rebuilds when deps change)
 COPY pyproject.toml uv.lock ./

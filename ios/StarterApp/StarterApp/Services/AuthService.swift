@@ -155,11 +155,7 @@ final class AuthService {
 
     // MARK: – HTTP helpers
 
-    private static let decoder: JSONDecoder = {
-        let decoder = JSONDecoder()
-        decoder.dateDecodingStrategy = .iso8601
-        return decoder
-    }()
+    private static let decoder = APIDateCoding.makeDecoder()
 
     private func post<B: Encodable, R: Decodable>(path: String, body: B) async throws -> R {
         var req = URLRequest(url: backendURL.appendingPathComponent(path))

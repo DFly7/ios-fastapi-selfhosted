@@ -1,15 +1,25 @@
 name: Backend Integration Tests
 
+# Not on pull_request — Backend CI unit tests cover PRs. Integration runs on
+# push to main (and workflow_dispatch) to save Actions minutes.
 on:
   push:
     branches: [main]
-    paths: ["backend/**"]
-  pull_request:
-    paths: ["backend/**"]
+    paths:
+      - "backend/**"
+      - ".github/workflows/backend-integration.yml"
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   integration:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
     services:
       postgres:
         image: postgres:17-alpine
@@ -27,16 +37,22 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v4
-      - run: uv sync
-        working-directory: backend
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+          cache-dependency-glob: "backend/uv.lock"
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
       - name: Run migrations
-        working-directory: backend
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/postgres_test
+          JWT_SECRET: testsecretatleast32charslong1234
         run: uv run alembic upgrade head
+
       - name: Run integration tests
-        working-directory: backend
         env:
           DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/postgres_test
           JWT_SECRET: testsecretatleast32charslong1234

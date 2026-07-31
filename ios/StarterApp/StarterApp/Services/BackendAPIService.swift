@@ -20,19 +20,29 @@ enum BackendAPIService {
     // MARK: - Shared codecs
 
     /// FastAPI serialises `datetime` fields as ISO 8601 strings; the decoder must match.
-    private static let decoder: JSONDecoder = {
-        let jsonDecoder = JSONDecoder()
-        jsonDecoder.dateDecodingStrategy = .iso8601
-        return jsonDecoder
-    }()
+    private static let decoder = APIDateCoding.makeDecoder()
 
-    private static let encoder: JSONEncoder = {
-        let jsonEncoder = JSONEncoder()
-        jsonEncoder.dateEncodingStrategy = .iso8601
-        return jsonEncoder
-    }()
+    private static let encoder = APIDateCoding.makeEncoder()
 
     // MARK: - Core request helpers
+
+    /// Builds a request URL from a path that may include a `?query` suffix.
+    /// `URL.appending(path:)` percent-encodes `?` and `&`, which breaks query strings.
+    static func requestURL(path: String) -> URL {
+        if let queryIndex = path.firstIndex(of: "?") {
+            let route = String(path[..<queryIndex])
+            let query = String(path[path.index(after: queryIndex)...])
+            var components = URLComponents(url: APIConfig.backendURL, resolvingAgainstBaseURL: false)!
+            let basePath = components.path.hasSuffix("/") ? String(components.path.dropLast()) : components.path
+            components.path = "\(basePath)/\(route)"
+            components.percentEncodedQuery = query
+            guard let url = components.url else {
+                fatalError("Invalid API path: \(path)")
+            }
+            return url
+        }
+        return APIConfig.backendURL.appending(path: path)
+    }
 
     /// Raw HTTP send. Takes an explicit non-optional token; does NOT perform refresh.
     /// - Throws: `AppError.networkFailure` on transport error, `AppError.requestFailed` on non-2xx.
@@ -43,7 +53,7 @@ enum BackendAPIService {
         token: String,
         session: URLSession
     ) async throws -> Data {
-        var urlRequest = URLRequest(url: APIConfig.backendURL.appending(path: path))
+        var urlRequest = URLRequest(url: requestURL(path: path))
         urlRequest.httpMethod = method
         urlRequest.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization")
         if let bodyData {

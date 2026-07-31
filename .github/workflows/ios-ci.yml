@@ -1,8 +1,9 @@
 # iOS: install Tuist deps, generate project, build + unit-test on Simulator.
 #
 # Notes:
-# - CODE_SIGNING_ALLOWED=NO is set in Project.swift base settings, so no
-#   certificates or provisioning profiles are required.
+# - Host app is ad-hoc signed (CODE_SIGN_IDENTITY=-) so Keychain entitlements
+#   embed on Simulator. Unsigned builds (CODE_SIGNING_ALLOWED=NO) return
+#   errSecMissingEntitlement (-34018) from SecItemAdd and break auth tests.
 # - Config-Debug.xcconfig / Config-Release.xcconfig are gitignored (local secrets).
 #   A CI step below generates them from Config.example.xcconfig; placeholder values
 #   are sufficient for a Simulator build. Real secrets (SUPABASE_ANON_KEY etc.)
@@ -92,9 +93,9 @@ jobs:
           echo "SIM_OS=$SIM_OS" >> "$GITHUB_ENV"
 
       # ── Build ──────────────────────────────────────────────────────────────
-      - name: Install xcpretty
-        run: gem install xcpretty --no-document
-
+      # Ad-hoc sign the host app so Keychain entitlements are embedded.
+      # CODE_SIGNING_ALLOWED=NO strips entitlements → SecItemAdd returns
+      # errSecMissingEntitlement (-34018) and KeychainTokenStore silently no-ops.
       - name: Build for testing
         run: |
           set -o pipefail
@@ -102,17 +103,38 @@ jobs:
             -workspace StarterApp.xcworkspace \
             -scheme StarterApp \
             -destination "platform=iOS Simulator,name=iPhone 16,OS=$SIM_OS" \
-            CODE_SIGNING_ALLOWED=NO \
-            | xcpretty
+            CODE_SIGN_IDENTITY=- \
+            CODE_SIGNING_REQUIRED=YES \
+            CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM= \
+            | xcbeautify --renderer github-actions
 
       # ── Unit tests ─────────────────────────────────────────────────────────
+      # xcpretty predates Swift Testing and swallows the suite verdict / failures
+      # (local scripts/ios-unit-test.sh documents the same trap → bare Error 65).
       - name: Run unit tests
         run: |
           set -o pipefail
+          LOG="$(mktemp)"
           xcodebuild test-without-building \
             -workspace StarterApp.xcworkspace \
             -scheme StarterApp \
             -destination "platform=iOS Simulator,name=iPhone 16,OS=$SIM_OS" \
             -only-testing:StarterAppTests \
-            CODE_SIGNING_ALLOWED=NO \
-            | xcpretty
+            -parallel-testing-enabled NO \
+            CODE_SIGN_IDENTITY=- \
+            CODE_SIGNING_REQUIRED=YES \
+            CODE_SIGNING_ALLOWED=YES \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM= \
+            2>&1 | tee "$LOG" | xcbeautify --renderer github-actions
+          RC=${PIPESTATUS[0]}
+          echo ""
+          grep -aoE "Test run with [0-9]+ tests? in [0-9]+ suites? (passed|failed)" "$LOG" | tail -1 \
+            || echo "⚠ No Swift Testing verdict in the log"
+          if [[ "$RC" -ne 0 ]]; then
+            echo "── Failing tests ──────────────────────────────────────────"
+            grep -aE "failed after|Issue recorded|Expectation failed|Testing failed:|Failing tests:" "$LOG" | head -60 || true
+          fi
+          exit "$RC"

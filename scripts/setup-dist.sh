@@ -36,9 +36,12 @@ echo ""
 echo "  This wizard will:"
 echo "    1. Validate your environment (git status, .p8 key, credentials)"
 echo "    2. Configure signing in Config-Release.xcconfig and Fastlane"
-echo "    3. Create the App Store Connect record via fastlane produce"
-echo "    4. Seed your private certs repo via fastlane match"
-echo "    5. Print the GitHub Secrets to add before your first tag push"
+echo "    3. Seed your private certs repo via fastlane match"
+echo "    4. Print the GitHub Secrets to add before your first tag push"
+echo ""
+echo "  Note: the App Store Connect app record is a one-time manual step"
+echo "  (App Store Connect → Apps → +, or interactive 'fastlane produce'"
+echo "  with Apple ID + 2FA). produce cannot use the API key / CI."
 echo ""
 
 # ── Phase 1: Pre-flight checks ───────────────────────────────────────────────
@@ -195,16 +198,8 @@ echo ""
 echo "${BOLD}  Phase 3 — Seed & provision${RESET}"
 echo ""
 
-# 3a. Create App Store Connect record (idempotent via produce)
-info "Creating App Store Connect record via fastlane produce..."
-if bundle exec fastlane create_app; then
-    success "App Store Connect record ready"
-else
-    warn "fastlane produce returned a non-zero exit (may already exist — that's fine)"
-fi
-
-# 3b. Seed the certs repo — MANDATORY before first CI run
-echo ""
+# 3a. Seed the certs repo — MANDATORY before first CI run
+# (ASC app record is intentionally NOT created here — produce needs 2FA.)
 info "Seeding certs repo via fastlane match appstore (this may take a minute)..."
 echo "  This generates/syncs certificates and provisioning profiles into:"
 echo "  ${MATCH_GIT_URL}"

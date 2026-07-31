@@ -102,7 +102,7 @@ def test_login_success_returns_tokens(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setattr(
         "app.repositories.user_repo.get_by_email", AsyncMock(return_value=_FakeUser())
     )
-    monkeypatch.setattr("app.api.v1.auth.verify_password", lambda pw, hashed: True)
+    monkeypatch.setattr("app.api.v1.auth.verify_password_async", AsyncMock(return_value=True))
     monkeypatch.setattr(
         "app.repositories.refresh_token_repo.create_refresh_token", AsyncMock(return_value=None)
     )
@@ -131,7 +131,7 @@ def test_login_wrong_password_returns_401(monkeypatch: pytest.MonkeyPatch) -> No
     monkeypatch.setattr(
         "app.repositories.user_repo.get_by_email", AsyncMock(return_value=_FakeUser())
     )
-    monkeypatch.setattr("app.api.v1.auth.verify_password", lambda pw, hashed: False)
+    monkeypatch.setattr("app.api.v1.auth.verify_password_async", AsyncMock(return_value=False))
 
     with TestClient(app) as client:
         r = client.post(
@@ -146,7 +146,7 @@ def test_login_disabled_account_returns_403(monkeypatch: pytest.MonkeyPatch) -> 
         "app.repositories.user_repo.get_by_email",
         AsyncMock(return_value=_FakeUser(is_active=False)),
     )
-    monkeypatch.setattr("app.api.v1.auth.verify_password", lambda pw, hashed: True)
+    monkeypatch.setattr("app.api.v1.auth.verify_password_async", AsyncMock(return_value=True))
 
     with TestClient(app) as client:
         r = client.post(

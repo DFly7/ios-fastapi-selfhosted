@@ -236,7 +236,8 @@ The wizard will:
 2. Validate your `.p8` key file is readable
 3. Smoke-test your credentials against App Store Connect
 4. Write `Config-Release.xcconfig` and update `fastlane/Appfile` + `fastlane/Matchfile`
-5. Create the App Store Connect app record via `fastlane produce`
+5. Create the App Store Connect app record **manually** once (App Store Connect → Apps → +, or interactive
+   `fastlane produce` with Apple ID + 2FA — API key auth is not supported)
 6. Seed your certs repo via `fastlane match appstore` — **this must complete successfully before you push a tag**
 7. Print every repository secret (including `PRODUCTION_BACKEND_URL`) so you can copy-paste them into GitHub
 
@@ -260,7 +261,7 @@ GitHub Actions → **Distribute to TestFlight** workflow runs automatically. The
 | `PRODUCTION_BACKEND_URL Actions secret is empty or missing` | Secret not set or typo in name | Add `PRODUCTION_BACKEND_URL` under **Settings → Secrets** (see Step 4c); re-run the workflow |
 | `tuist generate` fails in CI | `Config-Debug.xcconfig` or `Config-Release.xcconfig` missing | Check the "Write xcconfig" steps ran before `tuist generate` in the workflow log |
 | `match` fails in CI with "repo is empty" | `make setup-dist` was not run locally first | Run `make setup-dist` locally to seed the certs repo, then re-push the tag |
-| `upload_to_testflight` fails with "app not found" | App Store Connect record doesn't exist | Run `make create-app` locally |
+| `upload_to_testflight` fails with "app not found" | App Store Connect record doesn't exist | Create the app record manually in App Store Connect (or interactive `fastlane produce` with Apple ID + 2FA) |
 | Build stuck in "Missing Compliance" on TestFlight | `ITSAppUsesNonExemptEncryption` key missing | Already set to `false` in `Project.swift` — verify your `tuist generate` ran with the latest `Project.swift` |
 | `match` fails with "certificate has been revoked" | Someone revoked the cert outside of match | Run `fastlane match appstore --force` locally to regenerate |
 | CI fails with "No profiles for bundle ID" | Bundle ID in secret doesn't match the registered App ID | Verify `APP_BUNDLE_ID` secret matches exactly what was registered in the Developer Portal |

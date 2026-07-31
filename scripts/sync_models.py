@@ -121,6 +121,12 @@ def json_schema_to_swift_type(
       - the field is not required, OR
       - the type is a Pydantic nullable (anyOf: [{…}, {type: null}])
     """
+    # A $ref points at another generated model — emit that struct's name so
+    # nested models and lists of models get correct Swift types (not [String: String]).
+    if "$ref" in prop:
+        ref_name = prop["$ref"].split("/")[-1]
+        return ref_name if required else f"{ref_name}?"
+
     prop = _resolve_defs(prop, defs)
 
     # anyOf — Pydantic v2 emits anyOf:[{type:X},{type:null}] for T | None
@@ -155,10 +161,14 @@ def json_schema_to_swift_type(
         )
         swift = f"[{item_swift}]"
     elif t == "object":
-        # Typed dict-like → best effort
-        swift = "[String: String]"
+        # Open dict[str, Any] / additionalProperties objects → heterogeneous JSON.
+        # Typed nested models use $ref and are handled above.
+        if prop.get("properties"):
+            swift = "[String: AnyJSON]"
+        else:
+            swift = "[String: AnyJSON]"
     else:
-        swift = "AnyCodable"
+        swift = "AnyJSON"
 
     return swift if required else f"{swift}?"
 
@@ -183,7 +193,8 @@ def generate_swift_struct(class_name: str, schema: dict) -> str:
 
     # Doc-comment
     doc = description or f"Auto-generated from `{class_name}` (backend/app/schemas)."
-    lines.append(f"/// {doc}")
+    for doc_line in doc.splitlines():
+        lines.append(f"/// {doc_line}" if doc_line else "///")
 
     lines.append(f"struct {class_name}: Codable, Equatable {{")
 

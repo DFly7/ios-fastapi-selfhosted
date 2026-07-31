@@ -14,11 +14,12 @@ from app.db.session import get_db
 from app.repositories import profile_repo, refresh_token_repo, user_repo
 from app.schemas.auth import LoginRequest, RefreshRequest, RegisterRequest, TokenResponse, UserOut
 from app.services.auth_service import (
+    DUMMY_PASSWORD_HASH,
     create_access_token,
     create_refresh_token_value,
-    hash_password,
+    hash_password_async,
     hash_refresh_token,
-    verify_password,
+    verify_password_async,
 )
 
 logger = structlog.get_logger(__name__)
@@ -41,7 +42,7 @@ async def register(request: Request, body: RegisterRequest, db: AsyncSession = D
     if existing:
         raise HTTPException(status_code=409, detail="Email already registered")
 
-    hashed = hash_password(body.password)
+    hashed = await hash_password_async(body.password)
     user = await user_repo.create_user(db, body.email, hashed)
     await profile_repo.create_profile(db, user.id, display_name=body.display_name)
 
@@ -55,7 +56,9 @@ async def register(request: Request, body: RegisterRequest, db: AsyncSession = D
 @limiter.limit("5/minute")
 async def login(request: Request, body: LoginRequest, db: AsyncSession = Depends(get_db)):
     user = await user_repo.get_by_email(db, body.email)
-    if not user or not verify_password(body.password, user.hashed_password):
+    hashed = user.hashed_password if user is not None else DUMMY_PASSWORD_HASH
+    password_ok = await verify_password_async(body.password, hashed)
+    if user is None or not password_ok:
         raise HTTPException(status_code=401, detail="Invalid email or password")
     if not user.is_active:
         raise HTTPException(status_code=403, detail="Account disabled")

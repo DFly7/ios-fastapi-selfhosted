@@ -3,8 +3,9 @@ Structured logging with structlog: JSON in production, console in development.
 """
 
 import logging
+import re
 import sys
-from collections.abc import MutableMapping
+from collections.abc import Iterable, MutableMapping
 from typing import Any, cast
 
 import structlog
@@ -27,14 +28,40 @@ SENSITIVE_FIELDS = {
     "ssn",
 }
 
+# "token" means two different things here: an auth credential and a unit of LLM
+# text. These are the second kind — counts, not secrets — and must stay readable.
+SAFE_FIELDS = {
+    "token_count",
+    "tokens",
+    "tokens_in",
+    "tokens_out",
+    "input_tokens",
+    "output_tokens",
+    "prompt_tokens",
+    "completion_tokens",
+    "total_tokens",
+}
+
+_WORD_SPLIT = re.compile(r"[^a-z0-9]+")
+
+
+def is_sensitive_key(key: Any, sensitive_fields: Iterable[str] = ()) -> bool:
+    """Match whole words, not substrings: `access_token` is a secret, `tokens_in` is a metric."""
+    if not isinstance(key, str):
+        return False
+    lowered = key.lower()
+    if lowered in SAFE_FIELDS:
+        return False
+    words = {word for word in _WORD_SPLIT.split(lowered) if word}
+    fields = set(SENSITIVE_FIELDS) | set(sensitive_fields)
+    return any(set(field.lower().split("_")) <= words for field in fields)
+
 
 def mask_sensitive_data(logger: Any, method_name: str, event_dict: EventDict) -> EventDict:
     def _mask_dict(d: MutableMapping[str, Any]) -> dict[str, Any]:
         masked: dict[str, Any] = {}
         for key, value in d.items():
-            if isinstance(key, str) and any(
-                sensitive in key.lower() for sensitive in SENSITIVE_FIELDS
-            ):
+            if is_sensitive_key(key):
                 masked[key] = "***MASKED***"
             elif isinstance(value, dict):
                 masked[key] = _mask_dict(value)

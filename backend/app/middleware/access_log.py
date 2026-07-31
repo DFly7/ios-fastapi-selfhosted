@@ -43,6 +43,21 @@ def get_user_details(request: Request) -> tuple[str | None, str | None]:
     return user_id, user_email
 
 
+def request_context_bindings(
+    *,
+    user_id: str | None,
+    user_email: str | None,
+    client_ip: str | None,
+) -> dict[str, str | None]:
+    """Structlog bindings for the request. Omit absent email — never bind None."""
+    if not user_id:
+        return {}
+    bindings: dict[str, str | None] = {"user_id": user_id, "client_ip": client_ip}
+    if user_email:
+        bindings["user_email"] = user_email
+    return bindings
+
+
 async def get_request_body(request: Request, max_size: int = 1000) -> dict | None:
     try:
         content_type = request.headers.get("content-type", "")
@@ -79,12 +94,10 @@ class AccessLogMiddleware(BaseHTTPMiddleware):
         user_id, user_email = get_user_details(request)
         client_ip = get_client_ip(request)
 
-        if user_id:
-            structlog.contextvars.bind_contextvars(
-                user_id=user_id,
-                user_email=user_email,
-                client_ip=client_ip,
-            )
+        if bindings := request_context_bindings(
+            user_id=user_id, user_email=user_email, client_ip=client_ip
+        ):
+            structlog.contextvars.bind_contextvars(**bindings)
 
         request_body = None
         if settings.log_request_body and method in ("POST", "PUT", "PATCH"):

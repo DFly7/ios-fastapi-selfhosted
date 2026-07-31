@@ -17,6 +17,11 @@ let project = Project(
             bundleId: "$(PRODUCT_BUNDLE_IDENTIFIER)",
             deploymentTargets: .iOS("17.0"),
             infoPlist: .extendingDefault(with: [
+                // Expand from build settings so `xcodebuild CURRENT_PROJECT_VERSION=…`
+                // (fastlane beta / CI) can bump TestFlight build numbers. Tuist's
+                // default otherwise bakes literal "1" / "1.0" into the plist.
+                "CFBundleShortVersionString": "$(MARKETING_VERSION)",
+                "CFBundleVersion": "$(CURRENT_PROJECT_VERSION)",
                 // Declare standard HTTPS-only encryption so TestFlight build processing
                 // skips the manual compliance questionnaire and goes straight to testers.
                 // This app uses TLS via Apple's Network.framework only — no custom crypto.

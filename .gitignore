@@ -10,3 +10,6 @@
 
 # Environment variables
 .env
+
+# Per-worktree session simulator UDID (scripts/session-sim.sh / ios-sim.sh)
+.sim-udid

@@ -54,10 +54,13 @@ IOS_SIM="$REPO_ROOT/scripts/ios-sim.sh"
 # ---------------------------------------------------------------------------
 # Cleanup
 # ---------------------------------------------------------------------------
+# Base stack + local-dev overlay (bind-mounts backend source, runs uvicorn --reload).
+COMPOSE=(docker compose -f docker-compose.yml -f docker-compose.dev.yml)
+
 cleanup() {
   echo ""
   echo "==> Shutting down…"
-  (cd "$REPO_ROOT" && docker compose down 2>/dev/null) || true
+  (cd "$REPO_ROOT" && "${COMPOSE[@]}" down 2>/dev/null) || true
   echo "==> Done."
 }
 trap cleanup INT TERM EXIT
@@ -65,13 +68,13 @@ trap cleanup INT TERM EXIT
 # ---------------------------------------------------------------------------
 # 1–2. Docker Compose + Migrations
 # ---------------------------------------------------------------------------
-echo "==> Starting dev stack (PostgreSQL + FastAPI + Adminer)…"
+echo "==> Starting dev stack (PostgreSQL + FastAPI + Adminer)… backend hot-reloads on edit"
 cd "$REPO_ROOT"
-docker compose up --build -d
+"${COMPOSE[@]}" up --build -d
 
 echo "==> Running Alembic migrations…"
 sleep 3
-docker compose exec backend uv run alembic upgrade head
+"${COMPOSE[@]}" exec backend uv run alembic upgrade head
 
 # ---------------------------------------------------------------------------
 # 3. Wait for backend
@@ -98,17 +101,23 @@ if [[ ! -f "$XCCONFIG" ]]; then
   cp "$XCCONFIG_EXAMPLE" "$XCCONFIG"
 fi
 
-# Write BACKEND_URL (escaping colons and slashes for xcconfig safety)
-BACKEND_URL="http://127.0.0.1:8000"
-BACKEND_URL_ESCAPED="${BACKEND_URL//:/\$()/}"  # : → $()
-BACKEND_URL_ESCAPED="${BACKEND_URL_ESCAPED//\//\/}"  # / → /
-
-# Update or add BACKEND_URL
-if grep -q "^BACKEND_URL = " "$XCCONFIG"; then
-  sed -i '' "s|^BACKEND_URL = .*|BACKEND_URL = $BACKEND_URL_ESCAPED|" "$XCCONFIG"
-else
-  echo "BACKEND_URL = $BACKEND_URL_ESCAPED" >> "$XCCONFIG"
-fi
+# Write BACKEND_URL (escape // so xcconfig doesn't treat it as a comment — same as ios-device.sh)
+python3 - "$XCCONFIG" "http://127.0.0.1:8000" <<'EOF'
+import re, sys
+path, url = sys.argv[1], sys.argv[2]
+scheme, rest = url.split("://", 1)
+escaped = f"{scheme}:/$()/{rest}"
+line = f"BACKEND_URL = {escaped}\n"
+try:
+    text = open(path).read()
+except FileNotFoundError:
+    text = open(path.replace("Config-Debug.xcconfig", "Config.example.xcconfig")).read()
+if re.search(r'^\s*BACKEND_URL\s*=', text, re.M):
+    text = re.sub(r'^\s*BACKEND_URL\s*=.*$', line.rstrip("\n"), text, count=1, flags=re.M)
+else:
+    text = text.rstrip("\n") + "\n" + line
+open(path, "w").write(text)
+EOF
 
 # ---------------------------------------------------------------------------
 # 5. Tuist + iOS Simulator

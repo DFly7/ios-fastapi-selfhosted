@@ -335,7 +335,7 @@ The wizard will:
 
 - Validate your `Project.swift` is clean, your `.p8` key is readable, and your credentials resolve (smoke test — fails fast before writing anything)
 - Fill in `Config-Release.xcconfig` and `fastlane/Appfile` / `fastlane/Matchfile` with your values
-- Run `fastlane produce` to create the App Store Connect record and register the App ID (idempotent — safe to re-run)
+- Remind you that the App Store Connect app record is a **one-time manual** step (`produce` needs Apple ID + 2FA; API key auth is not supported)
 - Run `fastlane match appstore` to generate certificates and provisioning profiles and push them to your private certs repo
 - Print the exact GitHub Secrets to add
 
@@ -377,7 +377,6 @@ This triggers the **Distribute to TestFlight** GitHub Action. The build appears 
 | Command           | What it does                                    |
 | ----------------- | ----------------------------------------------- |
 | `make setup-dist` | Full one-time setup wizard                      |
-| `make create-app` | Re-create App Store Connect record (idempotent) |
 | `make beta`       | Build + upload to TestFlight locally            |
 | `make release`    | Build + submit to App Store locally             |
 

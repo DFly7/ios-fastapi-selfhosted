@@ -45,34 +45,128 @@ Do not invent new top-level conventions that contradict existing patterns in thi
 
 | | |
 |--|--|
-| **Run** | Repo root: **`make ios-test`** — `xcodebuild test` on **`StarterApp.xcworkspace`**, scheme **`StarterApp`**, **`-only-testing:StarterAppTests`**, Simulator via **`SIM_ID`** (override: `make ios-test SIM_ID=<udid>`). Output piped through **`xcpretty`**. UI tests: **`make ios-test-ui`** ( **`StarterAppUITests`** ). **`make validate`** runs **`ios-test`** then **`ios-build`**; it does **not** run UI tests. |
+| **Run** | Repo root: **`make ios-test`** (alias for **`ios-test-real`**) — `build-for-testing` + `test-without-building` via **`scripts/ios-unit-test.sh`**, scheme **`StarterApp`**, **`-only-testing:StarterAppTests`**, Simulator via **`SIM_ID`** from **`scripts/session-sim.sh`** (override: `make ios-test-real SIM_ID=<udid>`). UI tests: **`make ios-test-ui`** (**`StarterAppUITests`**). **`make validate`** runs **`ios-test-real`** then **`ios-build`**; it does **not** run UI tests. |
 | **Layout** | Tuist (**`Project.swift`**): **`StarterAppTests`** (`.unitTests`, `StarterAppTests/**/*.swift`), **`StarterAppUITests`** (`.uiTests`, `StarterAppUITests/**/*.swift`). |
 | **Conventions** | **Unit:** **Swift Testing** (`import Testing`, `@Suite`, `@Test`, `#expect`), `@testable import StarterApp`; use `@MainActor` on suites when app types require it. **UI:** **XCTest** (`XCUIApplication`, template-style tests). Scheme **`testAction`** currently lists only **`StarterAppTests`**; if **`make ios-test-ui`** misbehaves from CLI, add **`StarterAppUITests`** to the scheme’s Test action in **`Project.swift`**. |
 
 ## Verification (run from repo root)
 
-Prefer **`make validate`** before claiming work is ready to merge (lint, model sync check, backend tests, iOS unit tests, iOS build).
+Prefer **`make validate`** before claiming work is ready to merge (lint, model sync check, backend tests, iOS unit tests, iOS build). On **Cursor Cloud / Linux**, use **`make cloud-validate`** instead (no iOS).
 
 Useful targets:
 
 - `make help` — list all Makefile targets with descriptions.
 - `make backend-test` — backend unit tests (CI-like).
-- `make ios-test` — iOS unit tests (`StarterAppTests`).
+- `make backend-lint` — backend Ruff/mypy only (safe on Linux / Cursor Cloud).
+- `make cloud-validate` — models + backend lint/tests (no iOS). Default gate for Cursor Cloud agents.
+- `make ios-build` — build the app for Simulator, no tests. The fast inner-loop gate.
+- `make ios-test` / `make ios-test-real` — iOS unit tests (`StarterAppTests`).
+- `make worktree-init` / `make worktree-clean` — seed a fresh git worktree; reclaim DerivedData + session sim.
 - `make e2e-test` — local E2E UI test against running dev stack (`make dev` first). Not in CI or `validate`.
 - `make lint` — backend Ruff/mypy + SwiftLint.
 
 See `Makefile` for UI tests, Tuist generation, and local dev scripts.
 
+## Cursor Cloud specific instructions
+
+Cloud agents run on **Linux VMs** (see `.cursor/environment.json` + `.cursor/Dockerfile`). They are a
+**backend + API-contract workstation**, not a Mac. iOS compile/sim/device stay on macOS CI or a
+developer Mac.
+
+### Environment layout
+
+| Piece | How it gets there |
+|---|---|
+| Docker + Compose, `gh`, mise, Python 3.12, uv | `.cursor/Dockerfile` |
+| Seeded `.env` / `backend/.env`, `uv sync --frozen` | `scripts/cloud-agent-install.sh` |
+| Docker daemon + `postgres:17-alpine` on `:5432` | `scripts/cloud-agent-start.sh` |
+
+### What to run
+
+1. Default proof: **`make cloud-validate`** (`check-models` → `backend-lint` → `backend-test`).
+2. With DB (start script should already have brought Postgres up): `make backend-integration-test`.
+   Full API stack if needed: `docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d` then `make smoke-test`.
+3. After Pydantic schema edits: **`make sync-models`** (Python; works in cloud). Leave Xcode compile to **iOS CI**.
+4. Inspect iOS CI on the PR with **`gh`** — do not claim a green iOS build from Linux.
+
+### Do not run on Cloud
+
+- `make ios-build`, `make ios-test`, `make ios-device`, `make validate` (includes iOS), `make e2e-test`
+- Tuist generate / Simulator / physical device / ngrok
+- `alembic upgrade` against anything other than the local Compose Postgres
+
+### iOS / SwiftUI work from Cloud
+
+You may edit Swift and `Project.swift`. You **cannot** screenshot or compile.
+For UI verification, open a PR and watch **iOS CI**, or hand off to a Mac agent.
+Never invent “sim verified” without a Mac.
+
 ## iOS Simulator (agent mode)
 
-The agent can build, launch, screenshot, read, and interact with the iOS app from the terminal using `idb` (Facebook iOS Development Bridge) or the `ios-simulator` MCP server.
+Agents build, launch, screenshot, and tap the app from the terminal via **`scripts/ios-sim.sh`**, **`idb`**, or the **`ios-simulator` MCP** server. This section captures **roadblocks agents hit repeatedly** — read it before your first sim command in a session.
 
-- **Boot first:** Run `./scripts/ios-sim.sh --headless` if no simulator is booted — `idb` commands fail silently against a shutdown device.
+**NEVER pick the simulator with `simctl list devices booted`.** Several simulators may be booted at
+once — one per worktree — and the "first booted" one is usually *not* the one the script installed
+your build to.
+
+`scripts/ios-sim.sh` prints `→ SIM_UDID=<udid>` and writes the same value to **`.sim-udid`** at the
+repo root. That file is the only source of truth for which device holds your build:
+
+```bash
+UDID=$(cat .sim-udid)
+idb ui describe-all --udid "$UDID"
+xcrun simctl io "$UDID" screenshot /tmp/screen.png
+```
+
+Orchestrating a plan or worktree? Use `--session-sim` / `make` defaults (`SIM_ID` from
+`scripts/session-sim.sh`); every agent shares one bundle id, so installing onto a sim another
+agent is using **replaces their app with your build**.
+
+### Quick reference
+
+- **Boot first:** Run `./scripts/ios-sim.sh --headless` (with `--udid <UDID>` if another session owns the default sim) — `idb` commands **fail silently** against a shutdown device.
 - **Launch headless:** `./scripts/ios-sim.sh --headless --clean-state --verify-launch 5 --screenshot /tmp/screen.png`
-- **Read screen (accessibility tree):** `idb ui describe-all --udid <UDID>` — returns JSON with every label, button, frame
-- **Tap / type / swipe:** `idb ui tap <x> <y>`, `idb ui text "string"`, `idb ui swipe <x1> <y1> <x2> <y2>`
-- **Screenshot:** `idb screenshot /tmp/screen.png` — then view the image to verify visually
-- **MCP tools:** The `ios-simulator` MCP server (`.cursor/mcp.json`, `.claude/settings.json`) exposes `ui_describe_all`, `ui_tap`, `ui_type`, `screenshot` as native tool calls
+- **Read screen:** `idb ui describe-all --udid <UDID>`
+- **Tap / type / swipe:** always pass `--udid <UDID>` when more than one sim is booted.
+- **Screenshot:** then **Read the image** — don't infer pass from exit code alone.
+- **MCP tools:** same boot/UDID rules as `idb`.
+
+### Standard recipe
+
+```bash
+docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d
+docker compose -f docker-compose.yml -f docker-compose.dev.yml exec -T backend uv run alembic upgrade head
+curl -sf http://127.0.0.1:8000/healthz
+
+UDID=$(bash scripts/session-sim.sh)
+./scripts/ios-sim.sh --udid "$UDID" --headless --verify-launch 5 --screenshot /tmp/screen.png
+# Then Read /tmp/screen.png — do not claim UI pass without viewing it.
+```
+
+Simulator talks to **`http://127.0.0.1:8000`** (no tunnel). `scripts/dev.sh` writes `BACKEND_URL` into gitignored `ios/StarterApp/Config-Debug.xcconfig`.
+
+### Roadblocks
+
+| Symptom | Likely cause | Fix |
+|--------|----------------|-----|
+| `idb` tap/type does nothing, no error | Simulator **not booted**, or wrong **UDID** | Run `ios-sim.sh` first; pass `--udid` / use `.sim-udid` |
+| API OK but UI empty / 404 on query paths | **Decode or URL bug** | Fractional ISO8601 → `APIDateCoding`; query strings must not use `URL.appending(path:)` |
+| Routes missing, healthz OK | **Stale Docker image** | `docker compose -f docker-compose.yml -f docker-compose.dev.yml up --build -d` |
+| `make dev` then stack disappears | **`dev.sh` traps EXIT** and runs compose down | Keep `make dev` alive, or use detached compose recipe above |
+| App swapped mid-run / wrong UI | **Another agent installed same bundle id** onto your sim | Use **session sim** (`scripts/session-sim.sh` / `--session-sim`) |
+| `--verify-launch` flakes | **`launchctl` flaky** on newer iOS | Script prefers `pgrep`; check DiagnosticReports if still failing |
+| `Error 65` / missing `.xctest` | Shared DerivedData after plain `ios-build` | Use `make ios-build-for-testing` / `ios-test-real` |
+
+### Multi-agent / parallel sessions
+
+Before your first build in a worktree: rely on `SIM_ID` from `session-sim.sh` (Makefile default).
+When done: `make worktree-clean` to delete DerivedData + the session simulator.
+
+### ngrok + Cursor agents
+
+**Never start ngrok from an agent shell** — agent teardown kills the tunnel and breaks device
+testing mid-session. Start ngrok from a **human Terminal** window; agents may inject an existing
+URL via `BACKEND_URL` / `ios-device.sh --no-tunnel` patterns.
 
 ## iOS physical device (`make ios-device`)
 
@@ -97,17 +191,32 @@ ngrok tunnel → inject `BACKEND_URL` → `xcodebuild -destination generic/platf
   flaky/unavailable. Detached launch (`--verify-launch`) is also more reliable over USB.
 - **Flags:** `--no-tunnel`, `--device-id`, `--regen`, `--stop-tunnel`, `--console`, `--logs`.
 
-## Agent-only docs (not GitHub Pages)
+## Docs layout — product docs vs. agent planning
 
-The **`docs/`** tree is for the **published site** (e.g. GitHub Pages). Do not put internal design specs or implementation plans there.
+The **`docs/`** tree is for the **published site** (e.g. GitHub Pages waitlist) and any
+**product + reference** docs you choose to keep there. It is **not** where agent planning goes.
 
-**Canonical path:** **`.agents/superpowers/plans/`** (scaffolded in-repo). Put all agent planning artifacts there:
+**Agent planning goes in `.agents/superpowers/`.** See
+**[`.agents/superpowers/README.md`](.agents/superpowers/README.md)** for layout and conventions.
 
-- Implementation plans (writing-plans): `YYYY-MM-DD-<feature-name>.md`
-- Design / spec documents (brainstorming): `YYYY-MM-DD-<topic>-design.md`
+- Implementation plans (writing-plans): `plans/YYYY-MM-DD-<feature-name>.md`
+- Design / spec documents (brainstorming): `plans/YYYY-MM-DD-<topic>-design.md`
+- Legacy specs: **`.agents/superpowers/specs/`** (write new designs in `plans/`)
+- Completed / superseded plans + specs: **`.agents/archive/plans/`** and **`.agents/archive/specs/`**
 
-Do not add unrelated markdown unless the user asks. See **`.agents/superpowers/README.md`** for a quick reference.
+Do not add unrelated markdown unless the user asks.
+
+`CLAUDE.md` is a stub that points here — keep conventions in this file only.
+
+## Cursor CLI as a sub-agent
+
+When dispatching `cursor-agent` (or similar) as a background worker from this repo:
+
+- Prefer **`--yolo`** (or the non-interactive equivalent) so it can run tools without blocking on approvals you will not see.
+- **Always background** the process; never busy-wait a long agent run in the foreground.
+- Do **not** arbitrarily cap the run with a short timeout — wait for completion or a clear failure.
+- The brief must include a **verification contract** (which `make` targets / tests prove done).
 
 ## Git / completion
 
-When closing out a branch, follow **`.agents/skills/finishing-a-development-branch/SKILL.md`** — it is tailored to this repo’s **`make validate`** (and related Makefile targets).
+When closing out a branch, follow **`.agents/skills/finishing-a-development-branch/SKILL.md`** — it is tailored to this repo’s **`make validate`** / **`make cloud-validate`** (and related Makefile targets).

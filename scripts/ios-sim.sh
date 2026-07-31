@@ -10,6 +10,7 @@
 #   ./scripts/ios-sim.sh --clean-state          # erase sim before run (clears Keychain)
 #   ./scripts/ios-sim.sh --screenshot out.png   # capture screenshot after launch
 #   ./scripts/ios-sim.sh --verify-launch 5      # fail if app crashes within 5s
+#   ./scripts/ios-sim.sh --session-sim          # own simulator, named for this worktree
 #   ./scripts/ios-sim.sh --headless --clean-state --verify-launch 5  # full agent mode
 
 set -euo pipefail
@@ -24,6 +25,7 @@ CLEAN_STATE=false
 SCREENSHOT=""
 VERIFY_LAUNCH=0
 TARGET_UDID=""
+SESSION_SIM=false
 
 while [[ $# -gt 0 ]]; do
   case $1 in
@@ -34,6 +36,7 @@ while [[ $# -gt 0 ]]; do
     --screenshot)     SCREENSHOT="$2";     shift 2 ;;
     --verify-launch)  VERIFY_LAUNCH="${2:-5}"; shift 2 ;;
     --udid)           TARGET_UDID="$2";    shift 2 ;;
+    --session-sim)    SESSION_SIM=true;    shift ;;
     -h|--help)
       sed -n '/^# Usage/,/^$/p' "$0" | sed 's/^# \{0,2\}//'
       exit 0 ;;
@@ -82,6 +85,18 @@ fi
 }
 
 # ---------------------------------------------------------------------------
+# Session simulator — one device per worktree, named after it.
+#
+# Several agents work several worktrees at once, and they all reach for "an iPhone simulator".
+# Sharing one device means they install over each other and screenshot each other's app. A
+# device named for the worktree is unambiguous and survives across runs, so state (a signed-in
+# session, in-progress work) persists where you left it.
+# ---------------------------------------------------------------------------
+if [[ "$SESSION_SIM" == true && -z "$TARGET_UDID" ]]; then
+  TARGET_UDID=$(bash "$SCRIPT_DIR/session-sim.sh")
+fi
+
+# ---------------------------------------------------------------------------
 # Pick simulator — auto-selects the newest available iPhone if --udid not given
 # ---------------------------------------------------------------------------
 if [[ -z "$TARGET_UDID" ]]; then
@@ -119,6 +134,16 @@ fi
 
 SIM_NAME=$(xcrun simctl list devices available | grep "$TARGET_UDID" | sed 's/ (.*//' | xargs)
 echo "→ Simulator: ${SIM_NAME} (${TARGET_UDID})"
+
+# Publish the target so nothing downstream has to guess. Picking "the first booted simulator"
+# is the obvious guess and it is wrong: several simulators can be booted at once (one per git
+# worktree), and the one this script installs to is chosen by runtime version, not by boot
+# order. When the two disagree you screenshot a stale app on another device and debug a
+# phantom. Read the UDID from here — or from `SIM_UDID=` below — and never from `simctl list
+# devices booted`.
+SIM_UDID_FILE="$(git rev-parse --show-toplevel 2>/dev/null || echo .)/.sim-udid"
+printf '%s' "$TARGET_UDID" > "$SIM_UDID_FILE"
+echo "→ SIM_UDID=${TARGET_UDID}  (also written to ${SIM_UDID_FILE})"
 
 # ---------------------------------------------------------------------------
 # Clean state — erase simulator to clear Keychain, caches, app data
@@ -170,12 +195,16 @@ fi
 echo "→ Installing ${BUNDLE_ID}…"
 xcrun simctl install "$TARGET_UDID" "$APP_PATH"
 
+LAUNCH_PID=""
+LAUNCH_EPOCH=$(date +%s)
 if $LOGS; then
   echo "→ Launching with console logs (Ctrl-C to stop)…"
-  xcrun simctl launch --console-pty "$TARGET_UDID" "$BUNDLE_ID"
+  xcrun simctl launch --console-pty "$TARGET_UDID" "$BUNDLE_ID" ${LAUNCH_ARGS:-}
 else
   echo "→ Launching…"
-  xcrun simctl launch "$TARGET_UDID" "$BUNDLE_ID"
+  LAUNCH_OUTPUT=$(xcrun simctl launch "$TARGET_UDID" "$BUNDLE_ID" ${LAUNCH_ARGS:-})
+  LAUNCH_PID="${LAUNCH_OUTPUT##*: }"
+  echo "$LAUNCH_OUTPUT"
   echo ""
   echo "✓ ${BUNDLE_ID} running on ${SIM_NAME}"
 fi
@@ -192,16 +221,40 @@ fi
 
 # ---------------------------------------------------------------------------
 # Verify launch — poll for app process, fail if it crashed
+# launchctl list is flaky on newer iOS (especially headless); host pgrep is reliable.
 # ---------------------------------------------------------------------------
+sim_app_running() {
+  # Primary: any StarterApp process for this simulator device.
+  pgrep -f "Devices/${TARGET_UDID}/.*${SCHEME}\\.app/${SCHEME}" &>/dev/null && return 0
+  # Secondary: launch PID from simctl launch (fast when still the same process).
+  [[ -n "${LAUNCH_PID:-}" ]] && ps -p "$LAUNCH_PID" -o comm= &>/dev/null && return 0
+  # Tertiary: in-guest launchctl (can lag or drop UIKit jobs).
+  local list
+  list=$(xcrun simctl spawn "$TARGET_UDID" launchctl list 2>/dev/null || true)
+  grep -qE "UIKitApplication:${BUNDLE_ID}\\[" <<<"$list"
+}
+
 if [[ "$VERIFY_LAUNCH" -gt 0 ]]; then
   echo "→ Verifying app stayed alive for ${VERIFY_LAUNCH}s…"
   sleep "$VERIFY_LAUNCH"
-  if xcrun simctl spawn "$TARGET_UDID" launchctl list 2>/dev/null | grep -q "$BUNDLE_ID"; then
+
+  alive=false
+  for _ in $(seq 1 6); do
+    if sim_app_running; then
+      alive=true
+      break
+    fi
+    sleep 1
+  done
+
+  if $alive; then
     echo "  ✓ App is running."
+  elif find ~/Library/Logs/DiagnosticReports -name "${SCHEME}*" -newermt "@${LAUNCH_EPOCH}" 2>/dev/null | grep -q .; then
+    echo "  ✗ App crashed — recent crash report found:"
+    find ~/Library/Logs/DiagnosticReports -name "${SCHEME}*" -newermt "@${LAUNCH_EPOCH}" 2>/dev/null | head -1 | sed 's/^/    /'
+    exit 1
   else
     echo "  ✗ App is NOT running — may have crashed on launch."
-    echo "  Recent crash logs:"
-    find ~/Library/Logs/DiagnosticReports -name "StarterApp*" -newer "$APP_PATH" 2>/dev/null | head -3
     exit 1
   fi
 fi

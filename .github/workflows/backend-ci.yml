@@ -3,16 +3,15 @@
 # Secrets (GitHub → Settings → Secrets and variables → Actions):
 # - Do NOT put real API keys in this file.
 # - For smoke/unit tests: use plain `env:` values below (placeholders are fine if the app
-#   does not call external services during those tests).
-# - For integration tests that need a database: add repository secrets, e.g. DATABASE_URL and
-#   JWT_SECRET, then reference them only in `env:` (see optional block in test job).
+#   does not call external services during those tests). Settings requires DATABASE_URL and
+#   JWT_SECRET at import time — set CI placeholders in the test job env (not repo secrets).
 # - Prefer "Environments" (staging/production) with protection rules if a workflow deploys
 #   or uses elevated credentials.
 # - Forks: secrets are not passed to workflows from forks on pull_request; keep PR jobs
-#   passing with placeholders unless you use a dedicated integraton workflow on main only.
+#   passing with placeholders unless you use a dedicated integration workflow on main only.
 # - Docker publish: repository variable PUBLISH_BACKEND_IMAGE must be exactly `true`
 #   (Settings → Secrets and variables → Actions → Variables) to push to GHCR after a
-#   non-PR run. Otherwise the job still builds the image but does not log in or push.
+#   push/dispatch run. The docker-build job is skipped entirely on pull_request.
 
 name: Backend CI
 
@@ -32,7 +31,7 @@ on:
   workflow_dispatch:
 
 concurrency:
-  group: ci-${{ github.workflow }}-${{ github.ref }}
+  group: ci-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -62,9 +61,9 @@ jobs:
       - name: Mypy
         run: uv run mypy app
 
+  # Lint and unit tests run in parallel; downstream jobs wait on both.
   test:
     runs-on: ubuntu-latest
-    needs: lint
     defaults:
       run:
         working-directory: backend
@@ -85,6 +84,9 @@ jobs:
           ENVIRONMENT: ci
           LOG_JSON: "false"
           RATE_LIMIT_ENABLED: "false"
+          # Placeholders — unit tests do not hit a real DB. Required at Settings import.
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/postgres_test
+          JWT_SECRET: testsecretatleast32charslong1234
         run: |
           uv run pytest tests/ -v --tb=short -m "not integration" \
             --cov=app \
@@ -101,7 +103,7 @@ jobs:
   check-models:
     name: Swift models in sync
     runs-on: ubuntu-latest
-    needs: test
+    needs: [lint, test]
     defaults:
       run:
         working-directory: backend
@@ -121,8 +123,9 @@ jobs:
         run: uv run python ../scripts/sync_models.py --check
 
   docker-build:
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
-    needs: test
+    needs: [lint, test]
     permissions:
       contents: read
       packages: write
@@ -133,7 +136,7 @@ jobs:
       - uses: docker/setup-buildx-action@v3
 
       - name: Log in to GHCR
-        if: github.event_name != 'pull_request' && vars.PUBLISH_BACKEND_IMAGE == 'true'
+        if: vars.PUBLISH_BACKEND_IMAGE == 'true'
         uses: docker/login-action@v3
         with:
           registry: ghcr.io
@@ -155,7 +158,7 @@ jobs:
         with:
           context: backend
           file: backend/Dockerfile
-          push: ${{ github.event_name != 'pull_request' && vars.PUBLISH_BACKEND_IMAGE == 'true' }}
+          push: ${{ vars.PUBLISH_BACKEND_IMAGE == 'true' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha

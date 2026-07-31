@@ -206,9 +206,11 @@ for d in data.get("result", {}).get("devices", []):
     if conn.get("pairingState") != "paired":
         continue
     udid = hw.get("udid", "")
+    core_id = d.get("identifier", "")
     name = d.get("deviceProperties", {}).get("name", "?")
     if wanted:
-        if udid == wanted:
+        # devicectl list shows Identifier; xcodebuild wants hardware UDID.
+        if wanted in (udid, core_id):
             best = (udid, name); break
     else:
         # Prefer a connected device; otherwise take the first paired one.
