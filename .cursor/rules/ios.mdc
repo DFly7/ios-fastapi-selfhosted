@@ -6,8 +6,8 @@ alwaysApply: false
 
 # iOS (SwiftUI / Tuist)
 
-- **Canonical detail:** **`AGENTS.md`** → *TDD and testing* → **iOS**, plus **`ios/StarterApp/Project.swift`**, **`Makefile`** (`make help`).
-- **Verify changes:** From repo root, **`make ios-test`** (unit, **`StarterAppTests`**). UI: **`make ios-test-ui`**. Full gate: **`make validate`** (includes **`ios-test`** then **`ios-build`**; no UI tests).
-- **Project shape:** Edits go to **`Project.swift`**, **`Tuist/Package.swift`**, **`.xcconfig`** — not hand-edited **`.pbxproj`**. Regenerate: **`make ios-gen`** (`tuist install && tuist generate --no-open`).
-- **Tests:** **Swift Testing** in **`StarterAppTests`** (`@Suite`, `@Test`, `#expect`). **UI:** **XCTest** in **`StarterAppUITests`**. Workspace **`StarterApp.xcworkspace`**, scheme **`StarterApp`**, simulator via **`SIM_ID`** in Makefile.
+- **Canonical detail:** **`AGENTS.md`** → *TDD and testing* → **iOS**, plus **iOS Simulator (agent mode)**, **`ios/StarterApp/Project.swift`**, **`Makefile`** (`make help`).
+- **Verify changes:** From repo root, **`make ios-test`** / **`make ios-test-real`** (unit, **`StarterAppTests`** via session sim). UI: **`make ios-test-ui`**. Full gate: **`make validate`** (includes **`ios-test-real`** then **`ios-build`**; no UI tests). On Cursor Cloud / Linux use **`make cloud-validate`** (no iOS).
+- **Project shape:** Edits go to **`Project.swift`**, **`Tuist/Package.swift`**, **`.xcconfig`** — not hand-edited **`.pbxproj`**. Regenerate: **`make ios-gen`** (`tuist install && tuist generate --no-open`). Fresh worktrees: **`make worktree-init`**.
+- **Tests:** **Swift Testing** in **`StarterAppTests`** (`@Suite`, `@Test`, `#expect`). **UI:** **XCTest** in **`StarterAppUITests`**. Workspace **`StarterApp.xcworkspace`**, scheme **`StarterApp`**, simulator via **`SIM_ID`** from **`scripts/session-sim.sh`** (see `.sim-udid`).
 - **Generated models:** **`ios/StarterApp/StarterApp/Models/GeneratedModels.swift`** — do not hand-edit; use backend schemas + **`make sync-models`**.
